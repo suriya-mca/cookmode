@@ -4,38 +4,94 @@ Video-first cooking platform: structured recipe data, AI-inferred video anchor
 points, cook mode voice control, nutrition from ingredients, "I made this"
 posts, shopping lists, and ingredient-aware search.
 
-## Layout (monorepo)
+## Tech stack
+
+| Layer     | Tech                                          |
+|-----------|-----------------------------------------------|
+| API       | Go + Gin                                      |
+| Database  | PostgreSQL 17 (JSONB-first)                   |
+| Queue     | River (Postgres-backed — no Redis)            |
+| Search    | Meilisearch                                   |
+| Storage   | Cloudflare R2 (photos)                        |
+| Video     | Cloudflare Stream                             |
+| Auth      | Supabase Auth (JWT)                           |
+| Nutrition | Edamam (primary), USDA fallback               |
+
+## Monorepo layout
 
 ```
-backend/     Go API — owned by @suriya (branch: api)
-  cmd/api/       main server
-  cmd/migrate/   migration runner (embedded SQL)
-  internal/      api/, db/, jobs/, models/, services/, config/
-  migrations/    golang-migrate SQL files
-  pkg/           thin clients (Meilisearch, R2, Cloudflare Stream)
-frontend/    React Native + Expo app — owned by UI team (branch: ui)
-API_CONTRACT.md   REST API spec shared between backend and frontend
+backend/              Go API (branch: api)
+├── cmd/
+│   ├── api/          main server
+│   └── migrate/      migration runner (embedded SQL)
+├── internal/
+│   ├── api/          routes.go, handlers/, middleware/
+│   ├── config/       env loading
+│   ├── db/           pgx pool
+│   ├── jobs/         River workers (async pipeline)
+│   ├── models/       domain structs (mirror migrations)
+│   └── services/     business logic (video, nutrition, search)
+├── migrations/       SQL files (.up.sql / .down.sql pairs)
+├── pkg/              thin clients (Meilisearch, R2, Stream)
+├── docker-compose.yml  local Postgres + Meilisearch
+└── .env.example      template for backend/.env
+
+frontend/             React Native + Expo app (branch: ui)
+API_CONTRACT.md       REST API spec — shared with frontend team
 ```
 
-## Backend quick start
+## Local development
+
+Prerequisites: [Docker](https://docs.docker.com/get-docker/) and Go 1.27+.
 
 ```sh
 cd backend
-cp .env.example .env          # fill in real values
-go mod tidy
+
+# 1. Start Postgres (:5433) and Meilisearch (:7700)
+docker compose up -d
+
+# 2. Configure environment
+cp .env.example .env   # dev defaults already point at the compose stack
+
+# 3. Create tables
 make migrate-up
-make run                      # serves on :8080
+
+# 4. Run the server on :8080
+make run
 ```
 
-Commands: `make run | test | build | migrate-up | migrate-down`
-Single test: `go test ./internal/services -run TestName`
+Verify:
 
-## Stack
+```sh
+curl http://localhost:8080/api/v1/health
+# → {"status":"ok"}
+```
 
-Go + Gin · PostgreSQL (JSONB) · River queue (Postgres-backed) · Meilisearch ·
-Cloudflare R2 (photos) · Cloudflare Stream (video) · Supabase Auth ·
-Edamam/USDA (nutrition)
+Notes:
+- CookMode's Postgres maps to host port **5433** (not the default 5432) to
+  avoid conflicts with other local projects.
+- Stop everything with `docker compose down` (add `-v` to wipe data).
+- API endpoints can be tested interactively with
+  [Hoppscotch](https://hoppscotch.io) or any REST client.
+
+## Commands
+
+| Command             | Action                                    |
+|---------------------|-------------------------------------------|
+| `make run`          | Start the API server on :8080             |
+| `make test`         | Run all tests                             |
+| `make build`        | Build binary to `bin/api`                 |
+| `make migrate-up`   | Apply pending migrations                  |
+| `make migrate-down` | Roll back last migration                  |
+| `make tidy`         | Run `go mod tidy`                         |
+
+Single test: `go test ./internal/<pkg> -run TestName`
 
 ## Branches
 
-`main` = production · `dev` = integration · `api` = backend · `ui` = frontend
+| Branch | Purpose                    |
+|--------|----------------------------|
+| `main` | Production                 |
+| `dev`  | Integration                |
+| `api`  | Backend work               |
+| `ui`   | Frontend work              |

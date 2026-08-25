@@ -6,6 +6,11 @@
 - Branches: `main` = production, `dev` = integration, `api` = backend work, `ui` = frontend work. Backend agents commit to `api`.
 - All backend commands run from `backend/`.
 
+## Environment
+
+- Go 1.27 lives in `/usr/local/go/bin` (official tarball, shadows Fedora's package). In fresh/non-login shells: `export PATH=/usr/local/go/bin:$HOME/go/bin:$PATH`. gopls (v0.23) is at `~/go/bin/gopls`.
+- Local infra via `docker compose up -d` from `backend/`: Postgres 17 on **host port 5433** (5432 is taken by an unrelated project — never use it), Meilisearch v1.53 on 7700. `.env` already points at this stack.
+
 ## Backend commands
 
 - `make run` — dev server on :8080
@@ -21,6 +26,11 @@
 - Auth is Supabase JWT (HS256) via `internal/api/middleware/auth.go`; handlers read `user_id` with `middleware.UserIDFrom(c)`.
 - One pgx pool (`internal/db`) backs both queries and the River client. Initialize River via `jobs.NewClient(pool)` and `river.Start` it in `cmd/api/main.go`.
 - Recipes are JSONB-first: `ingredients`, `steps`, `substitutions`, `nutrition` columns mirror structs in `internal/models/recipe.go`. Keep model tags and `migrations/000001_init.up.sql` in sync when changing fields.
+
+## Current state (scaffold)
+
+- Handlers/services/jobs are stubs: routes return 501, services have TODO bodies.
+- River is NOT started yet: `cmd/api/main.go` has a TODO for `jobs.NewClient(pool)` + `river.Start`; River's own schema migrations are also not run anywhere yet. Wire both before implementing the upload flow.
 
 ## Async pipeline (River)
 

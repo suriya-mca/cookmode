@@ -1,0 +1,39 @@
+name: cookmode
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cookmode-postgres
+    environment:
+      POSTGRES_USER: cookmode
+      POSTGRES_PASSWORD: cookmode
+      POSTGRES_DB: cookmode
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cookmode -d cookmode"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.53.1
+    container_name: cookmode-meilisearch
+    environment:
+      MEILI_MASTER_KEY: cookmode-dev-master-key-min-16chars
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  meili_data:

@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS shopping_lists;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS recipes;

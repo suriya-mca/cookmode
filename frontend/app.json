@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "CookMode",
+    "slug": "cookmode",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cookmode.app"
+    },
+    "android": {
+      "package": "com.cookmode.app"
+    },
+    "plugins": [
+      "expo-video"
+    ]
+  }
+}

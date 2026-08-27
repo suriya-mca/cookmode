@@ -28,6 +28,7 @@ func NewRouter(d Deps) *gin.Engine {
 	handlers.RegisterHealth(v1)
 	handlers.RegisterRecipes(v1, d.Pool, d.SearchIndexer, d.VideoService, auth)
 	handlers.RegisterCollections(v1, d.Pool, auth)
+	handlers.RegisterFollows(v1, d.Pool, auth)
 	handlers.RegisterPosts(v1, d.Pool, auth)
 	handlers.RegisterShoppingLists(v1, d.Pool, d.NutritionService, auth)
 	handlers.RegisterSearch(v1, d.SearchIndexer)

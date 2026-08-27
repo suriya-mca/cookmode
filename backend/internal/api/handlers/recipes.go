@@ -39,6 +39,7 @@ func RegisterRecipes(
 			protected.DELETE("/:id", h.archive)
 			protected.POST("/:id/saves", h.save)
 			protected.DELETE("/:id/saves", h.unsave)
+			protected.POST("/:id/fork", h.fork)
 		}
 	}
 }
@@ -301,4 +302,32 @@ func (h *recipeHandler) uploadURL(c *gin.Context) {
 		"upload_url": url,
 		"recipe":     updated,
 	})
+}
+
+func (h *recipeHandler) fork(c *gin.Context) {
+	userID := middleware.UserIDFrom(c)
+	id := c.Param("id")
+	recipe, err := h.db.GetRecipe(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.ErrNotFound(c, "recipe not found")
+			return
+		}
+		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if recipe.Status == models.StatusArchived {
+		httpx.ErrBadRequest(c, "cannot fork archived recipe")
+		return
+	}
+	if recipe.Status != models.StatusPublished && recipe.UserID != userID {
+		httpx.ErrNotFound(c, "recipe not found")
+		return
+	}
+	forked, err := h.db.ForkRecipe(c.Request.Context(), id, userID)
+	if err != nil {
+		httpx.ErrInternal(c, "failed to fork")
+		return
+	}
+	c.JSON(http.StatusCreated, forked)
 }

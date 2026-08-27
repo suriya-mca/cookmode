@@ -37,6 +37,7 @@ func RegisterRecipes(
 			protected.POST("/upload-url", h.uploadURL)
 			protected.PATCH("/:id", h.update)
 			protected.DELETE("/:id", h.archive)
+			protected.POST("/:id/publish", h.publish)
 			protected.POST("/:id/saves", h.save)
 			protected.DELETE("/:id/saves", h.unsave)
 			protected.POST("/:id/fork", h.fork)
@@ -330,4 +331,47 @@ func (h *recipeHandler) fork(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, forked)
+}
+
+func (h *recipeHandler) publish(c *gin.Context) {
+	userID := middleware.UserIDFrom(c)
+	id := c.Param("id")
+	recipe, err := h.db.GetRecipe(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.ErrNotFound(c, "recipe not found")
+			return
+		}
+		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if recipe.UserID != userID {
+		httpx.ErrForbidden(c, "not your recipe")
+		return
+	}
+	if recipe.Status == models.StatusPublished {
+		c.JSON(http.StatusOK, recipe)
+		return
+	}
+	if recipe.Status == models.StatusArchived {
+		httpx.ErrBadRequest(c, "archived recipes cannot be published")
+		return
+	}
+	if msg := httpx.ValidateRecipe(recipe); msg != "" {
+		httpx.ErrBadRequest(c, "cannot publish: "+msg)
+		return
+	}
+	published, err := h.db.PublishRecipe(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.ErrBadRequest(c, "cannot publish in current status")
+			return
+		}
+		httpx.ErrInternal(c, "failed to publish")
+		return
+	}
+	if h.indexer != nil {
+		_ = h.indexer.IndexRecipe(c.Request.Context(), published)
+	}
+	c.JSON(http.StatusOK, published)
 }

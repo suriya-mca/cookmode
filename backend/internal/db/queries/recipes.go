@@ -215,3 +215,11 @@ func (db *DB) SetRecipeVideo(ctx context.Context, id, videoUID, status string) (
 	`, videoUID, status, id)
 	return scanRecipe(row)
 }
+
+func (db *DB) PublishRecipe(ctx context.Context, id string) (*models.Recipe, error) {
+	row := db.Pool.QueryRow(ctx, `
+		UPDATE recipes SET status='published' WHERE id=$1 AND status IN ('draft','processing')
+		RETURNING id, user_id, title, description, cuisine, prep_time_min, cook_time_min, servings, difficulty, dietary_tags, ingredients, steps, substitutions, nutrition, video_uid, video_hls_url, video_thumbnail_url, video_duration_sec, views, saves, status, created_at, updated_at
+	`, id)
+	return scanRecipe(row)
+}

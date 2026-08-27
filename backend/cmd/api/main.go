@@ -13,6 +13,7 @@ import (
 	"cookmode/internal/api"
 	"cookmode/internal/config"
 	"cookmode/internal/db"
+	"cookmode/internal/jobs"
 	"cookmode/internal/services"
 )
 
@@ -28,7 +29,18 @@ func main() {
 	}
 	defer pool.Close()
 
-	// TODO: initialize River client and register workers (internal/jobs).
+	riverClient, err := jobs.NewClient(pool)
+	if err != nil {
+		log.Fatalf("river client: %v", err)
+	}
+
+	if err := jobs.Migrate(ctx, pool); err != nil {
+		log.Fatalf("river migrate: %v", err)
+	}
+
+	if err := riverClient.Start(ctx); err != nil {
+		log.Fatalf("river start: %v", err)
+	}
 
 	router := api.NewRouter(api.Deps{
 		Pool:             pool,
@@ -61,6 +73,11 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("forced shutdown: %v", err)
 	}
+
+	if err := riverClient.Stop(shutdownCtx); err != nil {
+		log.Printf("river stop: %v", err)
+	}
+
 	cancel()
 	log.Println("stopped")
 }

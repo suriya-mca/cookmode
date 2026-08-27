@@ -29,7 +29,9 @@ func main() {
 	}
 	defer pool.Close()
 
-	riverClient, err := jobs.NewClient(pool)
+	searchIndexer := services.NewSearchIndexer(cfg.MeiliHost, cfg.MeiliAPIKey)
+
+	riverClient, err := jobs.NewClient(pool, searchIndexer)
 	if err != nil {
 		log.Fatalf("river client: %v", err)
 	}
@@ -44,7 +46,7 @@ func main() {
 
 	router := api.NewRouter(api.Deps{
 		Pool:             pool,
-		SearchIndexer:    services.NewSearchIndexer(cfg.MeiliHost, cfg.MeiliAPIKey),
+		SearchIndexer:    searchIndexer,
 		VideoService:     services.NewVideoService(cfg.CFStreamAccountID, cfg.CFStreamAPIToken),
 		NutritionService: services.NewNutritionService(cfg.EdamamAppID, cfg.EdamamAppKey, cfg.USDAAPIKey),
 		JWTSecret:        cfg.SupabaseJWTSecret,

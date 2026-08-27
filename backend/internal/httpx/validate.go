@@ -1,0 +1,64 @@
+package httpx
+
+import (
+	"strings"
+
+	"cookmode/internal/models"
+)
+
+func ValidateRecipe(r *models.Recipe) string {
+	if strings.TrimSpace(r.Title) == "" {
+		return "title is required"
+	}
+	if len(r.Title) > 200 {
+		return "title must be at most 200 characters"
+	}
+	if len(r.Description) > 5000 {
+		return "description must be at most 5000 characters"
+	}
+	if r.Servings < 0 {
+		return "servings must be >= 0"
+	}
+	if r.PrepTimeMin < 0 || r.CookTimeMin < 0 {
+		return "prep_time and cook_time must be >= 0"
+	}
+	if r.Difficulty != "" && r.Difficulty != models.DifficultyEasy && r.Difficulty != models.DifficultyMedium && r.Difficulty != models.DifficultyHard {
+		return "difficulty must be easy, medium, or hard"
+	}
+	for _, tag := range r.DietaryTags {
+		if strings.TrimSpace(tag) == "" {
+			return "dietary_tags must not contain empty values"
+		}
+	}
+	for i, ing := range r.Ingredients {
+		if strings.TrimSpace(ing.Name) == "" {
+			return "ingredients[" + itoa(i) + "].name is required"
+		}
+		if ing.Quantity < 0 {
+			return "ingredients[" + itoa(i) + "].quantity must be >= 0"
+		}
+	}
+	for i, s := range r.Steps {
+		if strings.TrimSpace(s.Text) == "" {
+			return "steps[" + itoa(i) + "].text is required"
+		}
+		if s.AnchorSeconds < 0 {
+			return "steps[" + itoa(i) + "].anchor_seconds must be >= 0"
+		}
+	}
+	return ""
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var buf [20]byte
+	pos := len(buf)
+	for n > 0 {
+		pos--
+		buf[pos] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(buf[pos:])
+}

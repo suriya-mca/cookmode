@@ -34,10 +34,10 @@ func RegisterRecipes(
 		protected := recipes.Group("", auth.Middleware())
 		{
 			protected.POST("", h.create)
+			protected.POST("/upload-url", h.uploadURL)
 			protected.PATCH("/:id", h.update)
 			protected.DELETE("/:id", h.archive)
 			protected.POST("/:id/saves", h.save)
-			protected.POST("/upload-url", h.uploadURL)
 		}
 	}
 }
@@ -224,4 +224,45 @@ func (h *recipeHandler) archive(c *gin.Context) {
 
 func (h *recipeHandler) save(c *gin.Context) { c.JSON(501, gin.H{"error": "not implemented"}) }
 
-func (h *recipeHandler) uploadURL(c *gin.Context) { c.JSON(501, gin.H{"error": "not implemented"}) }
+func (h *recipeHandler) uploadURL(c *gin.Context) {
+	userID := middleware.UserIDFrom(c)
+	var req struct {
+		RecipeID string `json:"recipe_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.RecipeID == "" {
+		httpx.ErrBadRequest(c, "recipe_id is required")
+		return
+	}
+	recipe, err := h.db.GetRecipe(c.Request.Context(), req.RecipeID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.ErrNotFound(c, "recipe not found")
+			return
+		}
+		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if recipe.UserID != userID {
+		httpx.ErrForbidden(c, "not your recipe")
+		return
+	}
+	if recipe.Status == models.StatusArchived {
+		httpx.ErrBadRequest(c, "archived recipes cannot get upload url")
+		return
+	}
+	uid, url, err := h.video.CreateDirectUploadURL()
+	if err != nil {
+		httpx.ErrInternal(c, "failed to create upload url")
+		return
+	}
+	updated, err := h.db.SetRecipeVideo(c.Request.Context(), req.RecipeID, uid, string(models.StatusProcessing))
+	if err != nil {
+		httpx.ErrInternal(c, "failed to update recipe")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"video_uid":  uid,
+		"upload_url": url,
+		"recipe":     updated,
+	})
+}

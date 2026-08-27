@@ -207,3 +207,11 @@ func (db *DB) ArchiveRecipe(ctx context.Context, id string) (*models.Recipe, err
 	`, id)
 	return scanRecipe(row)
 }
+
+func (db *DB) SetRecipeVideo(ctx context.Context, id, videoUID, status string) (*models.Recipe, error) {
+	row := db.Pool.QueryRow(ctx, `
+		UPDATE recipes SET video_uid=$1, status=$2 WHERE id=$3
+		RETURNING id, user_id, title, description, cuisine, prep_time_min, cook_time_min, servings, difficulty, dietary_tags, ingredients, steps, substitutions, nutrition, video_uid, video_hls_url, video_thumbnail_url, video_duration_sec, views, saves, status, created_at, updated_at
+	`, videoUID, status, id)
+	return scanRecipe(row)
+}

@@ -67,12 +67,31 @@ curl http://localhost:8080/api/v1/health
 # → {"status":"ok"}
 ```
 
+### Publishing and search
+
+Recipes are created as `draft`. Publish to make them visible in `GET /recipes` and search:
+
+```sh
+curl -X POST http://localhost:8080/api/v1/recipes/<id>/publish \
+  -H "Authorization: Bearer <token>"
+```
+
+Publishing also indexes the recipe in Meilisearch (`GET /search?q=...`). Video upload (`POST /recipes/upload-url`) sets `status=processing`; the publish step is manual until the Stream → transcribe → anchors pipeline is fully wired.
+
 Notes:
 - CookMode's Postgres maps to host port **5433** (not the default 5432) to
   avoid conflicts with other local projects.
 - Stop everything with `docker compose down` (add `-v` to wipe data).
 - API endpoints can be tested interactively with
   [Hoppscotch](https://hoppscotch.io) or any REST client.
+
+## Testing
+
+```sh
+cd backend
+go test ./...                          # all unit tests (no DB needed)
+go test ./internal/httpx -run TestValidateRecipe
+```
 
 ## Commands
 

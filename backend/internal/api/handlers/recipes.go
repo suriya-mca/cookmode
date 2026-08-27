@@ -38,6 +38,7 @@ func RegisterRecipes(
 			protected.PATCH("/:id", h.update)
 			protected.DELETE("/:id", h.archive)
 			protected.POST("/:id/saves", h.save)
+			protected.DELETE("/:id/saves", h.unsave)
 		}
 	}
 }
@@ -222,7 +223,42 @@ func (h *recipeHandler) archive(c *gin.Context) {
 	c.JSON(http.StatusOK, archived)
 }
 
-func (h *recipeHandler) save(c *gin.Context) { c.JSON(501, gin.H{"error": "not implemented"}) }
+func (h *recipeHandler) save(c *gin.Context) {
+	userID := middleware.UserIDFrom(c)
+	id := c.Param("id")
+	recipe, err := h.db.GetRecipe(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.ErrNotFound(c, "recipe not found")
+			return
+		}
+		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if recipe.Status == models.StatusArchived {
+		httpx.ErrBadRequest(c, "cannot save archived recipe")
+		return
+	}
+	if recipe.Status != models.StatusPublished && recipe.UserID != userID {
+		httpx.ErrNotFound(c, "recipe not found")
+		return
+	}
+	if err := h.db.SaveRecipe(c.Request.Context(), userID, id); err != nil {
+		httpx.ErrInternal(c, "failed to save")
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"saved": true})
+}
+
+func (h *recipeHandler) unsave(c *gin.Context) {
+	userID := middleware.UserIDFrom(c)
+	id := c.Param("id")
+	if err := h.db.UnsaveRecipe(c.Request.Context(), userID, id); err != nil {
+		httpx.ErrInternal(c, "failed to unsave")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"saved": false})
+}
 
 func (h *recipeHandler) uploadURL(c *gin.Context) {
 	userID := middleware.UserIDFrom(c)

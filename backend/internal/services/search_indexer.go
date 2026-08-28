@@ -12,9 +12,9 @@ import (
 )
 
 type SearchIndexer struct {
-	client  sdk.ServiceManager
-	once    sync.Once
-	initErr error
+	client      sdk.ServiceManager
+	initMu      sync.Mutex
+	initialized bool
 }
 
 func NewSearchIndexer(host, apiKey string) *SearchIndexer {
@@ -94,10 +94,16 @@ func (s *SearchIndexer) configure(ctx context.Context) error {
 }
 
 func (s *SearchIndexer) ensureOnce(ctx context.Context) error {
-	s.once.Do(func() {
-		s.initErr = s.EnsureIndex(ctx)
-	})
-	return s.initErr
+	s.initMu.Lock()
+	defer s.initMu.Unlock()
+	if s.initialized {
+		return nil
+	}
+	if err := s.EnsureIndex(ctx); err != nil {
+		return err
+	}
+	s.initialized = true
+	return nil
 }
 
 func (s *SearchIndexer) IndexRecipe(ctx context.Context, r *models.Recipe) error {

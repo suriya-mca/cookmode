@@ -17,6 +17,7 @@ type SearchIndexer struct {
 	initErr error
 }
 
+// NewSearchIndexer creates a search indexer configured to connect to the specified host with the provided API key.
 func NewSearchIndexer(host, apiKey string) *SearchIndexer {
 	return &SearchIndexer{client: sdk.New(host, sdk.WithAPIKey(apiKey))}
 }
@@ -136,6 +137,7 @@ type SearchParams struct {
 	Offset      int
 }
 
+// quoteFilterValue escapes backslashes and double quotes in a filter value and surrounds it with double quotes.
 func quoteFilterValue(v string) string {
 	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 	return `"` + r.Replace(v) + `"`

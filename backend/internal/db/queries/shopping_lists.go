@@ -69,6 +69,78 @@ func (db *DB) UpdateShoppingListItems(ctx context.Context, id, userID string, it
 	return scanShoppingList(row)
 }
 
+func (db *DB) AppendShoppingListItems(ctx context.Context, id, userID string, newItems []models.ShoppingListItem) (*models.ShoppingList, error) {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	var l models.ShoppingList
+	var items []byte
+	err = tx.QueryRow(ctx, `SELECT id, user_id, title, items, created_at, updated_at FROM shopping_lists WHERE id=$1 AND user_id=$2 FOR UPDATE`, id, userID).Scan(&l.ID, &l.UserID, &l.Title, &items, &l.CreatedAt, &l.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(items, &l.Items); err != nil {
+		return nil, err
+	}
+	if l.Items == nil {
+		l.Items = []models.ShoppingListItem{}
+	}
+	l.Items = append(l.Items, newItems...)
+	b, _ := json.Marshal(l.Items)
+	row := tx.QueryRow(ctx, `UPDATE shopping_lists SET items=$1 WHERE id=$2 AND user_id=$3 RETURNING id, user_id, title, items, created_at, updated_at`, b, id, userID)
+	res, err := scanShoppingList(row)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (db *DB) ToggleShoppingListItem(ctx context.Context, id, userID string, idx int, checked bool) (*models.ShoppingList, error) {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	var l models.ShoppingList
+	var items []byte
+	err = tx.QueryRow(ctx, `SELECT id, user_id, title, items, created_at, updated_at FROM shopping_lists WHERE id=$1 AND user_id=$2 FOR UPDATE`, id, userID).Scan(&l.ID, &l.UserID, &l.Title, &items, &l.CreatedAt, &l.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(items, &l.Items); err != nil {
+		return nil, err
+	}
+	if l.Items == nil {
+		l.Items = []models.ShoppingListItem{}
+	}
+	if idx < 0 || idx >= len(l.Items) {
+		return nil, &IndexOutOfRangeError{Idx: idx, Len: len(l.Items)}
+	}
+	l.Items[idx].Checked = checked
+	b, _ := json.Marshal(l.Items)
+	row := tx.QueryRow(ctx, `UPDATE shopping_lists SET items=$1 WHERE id=$2 AND user_id=$3 RETURNING id, user_id, title, items, created_at, updated_at`, b, id, userID)
+	res, err := scanShoppingList(row)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+type IndexOutOfRangeError struct {
+	Idx int
+	Len int
+}
+
+func (e *IndexOutOfRangeError) Error() string { return "itemIndex out of range" }
+
 func (db *DB) DeleteShoppingList(ctx context.Context, id, userID string) error {
 	res, err := db.Pool.Exec(ctx, `DELETE FROM shopping_lists WHERE id=$1 AND user_id=$2`, id, userID)
 	if err != nil {

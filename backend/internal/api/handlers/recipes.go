@@ -288,12 +288,16 @@ func (h *recipeHandler) uploadURL(c *gin.Context) {
 		httpx.ErrBadRequest(c, "archived recipes cannot get upload url")
 		return
 	}
-	uid, url, err := h.video.CreateDirectUploadURL()
+	uid, url, err := h.video.CreateDirectUploadURL(c.Request.Context())
 	if err != nil {
 		httpx.ErrInternal(c, "failed to create upload url")
 		return
 	}
-	updated, err := h.db.SetRecipeVideo(c.Request.Context(), req.RecipeID, uid, string(models.StatusProcessing))
+	status := recipe.Status
+	if status != models.StatusPublished {
+		status = models.StatusProcessing
+	}
+	updated, err := h.db.SetRecipeVideo(c.Request.Context(), req.RecipeID, uid, string(status))
 	if err != nil {
 		httpx.ErrInternal(c, "failed to update recipe")
 		return

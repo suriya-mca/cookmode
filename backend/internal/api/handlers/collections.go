@@ -216,12 +216,17 @@ func (h *collectionHandler) addRecipe(c *gin.Context) {
 		httpx.ErrBadRequest(c, "recipe_id is required")
 		return
 	}
-	if _, err := h.db.GetRecipe(c.Request.Context(), req.RecipeID); err != nil {
+	recipe, err := h.db.GetRecipe(c.Request.Context(), req.RecipeID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httpx.ErrNotFound(c, "recipe not found")
 			return
 		}
 		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if !isRecipeVisible(recipe, userID) {
+		httpx.ErrNotFound(c, "recipe not found")
 		return
 	}
 	if err := h.db.AddRecipeToCollection(c.Request.Context(), id, req.RecipeID); err != nil {

@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"strconv"
 	"strings"
+	"sync"
 
 	sdk "github.com/meilisearch/meilisearch-go"
 
@@ -10,7 +12,9 @@ import (
 )
 
 type SearchIndexer struct {
-	client sdk.ServiceManager
+	client  sdk.ServiceManager
+	once    sync.Once
+	initErr error
 }
 
 func NewSearchIndexer(host, apiKey string) *SearchIndexer {
@@ -89,11 +93,18 @@ func (s *SearchIndexer) configure(ctx context.Context) error {
 	return err
 }
 
+func (s *SearchIndexer) ensureOnce(ctx context.Context) error {
+	s.once.Do(func() {
+		s.initErr = s.EnsureIndex(ctx)
+	})
+	return s.initErr
+}
+
 func (s *SearchIndexer) IndexRecipe(ctx context.Context, r *models.Recipe) error {
 	if r.Status != models.StatusPublished {
 		return s.DeleteRecipe(ctx, r.ID)
 	}
-	if err := s.EnsureIndex(ctx); err != nil {
+	if err := s.ensureOnce(ctx); err != nil {
 		return err
 	}
 	doc := recipeToDoc(r)
@@ -125,29 +136,31 @@ type SearchParams struct {
 	Offset      int
 }
 
+func quoteFilterValue(v string) string {
+	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	return `"` + r.Replace(v) + `"`
+}
+
 func (s *SearchIndexer) Search(ctx context.Context, p SearchParams) (*sdk.SearchResponse, error) {
-	if err := s.EnsureIndex(ctx); err != nil {
-		return nil, err
-	}
 	var filters []string
 	if len(p.Ingredients) > 0 {
 		for _, ing := range p.Ingredients {
-			filters = append(filters, `ingredients = "`+strings.ToLower(strings.TrimSpace(ing))+`"`)
+			filters = append(filters, `ingredients = `+quoteFilterValue(strings.ToLower(strings.TrimSpace(ing))))
 		}
 	}
 	if len(p.Dietary) > 0 {
 		for _, d := range p.Dietary {
-			filters = append(filters, `dietary_tags = "`+strings.TrimSpace(d)+`"`)
+			filters = append(filters, `dietary_tags = `+quoteFilterValue(strings.TrimSpace(d)))
 		}
 	}
 	if p.Difficulty != "" {
-		filters = append(filters, `difficulty = "`+p.Difficulty+`"`)
+		filters = append(filters, `difficulty = `+quoteFilterValue(p.Difficulty))
 	}
 	if p.Cuisine != "" {
-		filters = append(filters, `cuisine = "`+p.Cuisine+`"`)
+		filters = append(filters, `cuisine = `+quoteFilterValue(p.Cuisine))
 	}
 	if p.MaxTime != nil {
-		filters = append(filters, `total_time <= `+itoa(*p.MaxTime))
+		filters = append(filters, `total_time <= `+strconv.Itoa(*p.MaxTime))
 	}
 	filterStr := ""
 	if len(filters) > 0 {
@@ -163,18 +176,4 @@ func (s *SearchIndexer) Search(ctx context.Context, p SearchParams) (*sdk.Search
 		Filter: filterStr,
 	}
 	return s.client.Index("recipes").SearchWithContext(ctx, p.Query, req)
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	pos := len(buf)
-	for n > 0 {
-		pos--
-		buf[pos] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[pos:])
 }

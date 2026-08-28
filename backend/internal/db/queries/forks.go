@@ -34,7 +34,12 @@ func (db *DB) ForkRecipe(ctx context.Context, parentID, userID string) (*models.
 	if parent.DietaryTags == nil {
 		parent.DietaryTags = []string{}
 	}
-	row := db.Pool.QueryRow(ctx, `
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	row := tx.QueryRow(ctx, `
 		INSERT INTO recipes (user_id, title, description, cuisine, prep_time_min, cook_time_min, servings, difficulty, dietary_tags, ingredients, steps, substitutions, nutrition, status)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'draft')
 		RETURNING id, user_id, title, description, cuisine, prep_time_min, cook_time_min, servings, difficulty, dietary_tags, ingredients, steps, substitutions, nutrition, video_uid, video_hls_url, video_thumbnail_url, video_duration_sec, views, saves, status, created_at, updated_at
@@ -43,8 +48,11 @@ func (db *DB) ForkRecipe(ctx context.Context, parentID, userID string) (*models.
 	if err != nil {
 		return nil, err
 	}
-	_, err = db.Pool.Exec(ctx, `INSERT INTO recipe_forks (parent_recipe_id, child_recipe_id, user_id) VALUES ($1,$2,$3)`, parentID, child.ID, userID)
+	_, err = tx.Exec(ctx, `INSERT INTO recipe_forks (parent_recipe_id, child_recipe_id, user_id) VALUES ($1,$2,$3)`, parentID, child.ID, userID)
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return child, nil

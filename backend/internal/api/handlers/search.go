@@ -22,13 +22,19 @@ func RegisterSearch(rg *gin.RouterGroup, indexer *services.SearchIndexer) {
 		cuisine := c.Query("cuisine")
 		var maxTime *int
 		if v := c.Query("max_total_time"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				maxTime = &n
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 {
+				httpx.ErrBadRequest(c, "max_total_time must be a non-negative integer")
+				return
 			}
+			maxTime = &n
 		} else if v := c.Query("max_time"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				maxTime = &n
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 {
+				httpx.ErrBadRequest(c, "max_time must be a non-negative integer")
+				return
 			}
+			maxTime = &n
 		}
 		limit := 20
 		if v := c.Query("limit"); v != "" {

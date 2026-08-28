@@ -104,6 +104,10 @@ func (h *shoppingListHandler) create(c *gin.Context) {
 			httpx.ErrInternal(c, "failed to get recipe")
 			return
 		}
+		if !isRecipeVisible(recipe, userID) {
+			httpx.ErrNotFound(c, "recipe not found: "+rid)
+			return
+		}
 		factor := 1.0
 		if req.Servings != nil && recipe.Servings > 0 {
 			factor = float64(*req.Servings) / float64(recipe.Servings)
@@ -152,18 +156,12 @@ func (h *shoppingListHandler) addItems(c *gin.Context) {
 			return
 		}
 	}
-	list, err := h.db.GetShoppingList(c.Request.Context(), id, userID)
+	updated, err := h.db.AppendShoppingListItems(c.Request.Context(), id, userID, req.Items)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httpx.ErrNotFound(c, "shopping list not found")
 			return
 		}
-		httpx.ErrInternal(c, "failed to get")
-		return
-	}
-	list.Items = append(list.Items, req.Items...)
-	updated, err := h.db.UpdateShoppingListItems(c.Request.Context(), id, userID, list.Items)
-	if err != nil {
 		httpx.ErrInternal(c, "failed to update")
 		return
 	}
@@ -185,22 +183,17 @@ func (h *shoppingListHandler) checkItem(c *gin.Context) {
 		httpx.ErrBadRequest(c, "checked is required")
 		return
 	}
-	list, err := h.db.GetShoppingList(c.Request.Context(), id, userID)
+	updated, err := h.db.ToggleShoppingListItem(c.Request.Context(), id, userID, idx, *req.Checked)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httpx.ErrNotFound(c, "shopping list not found")
 			return
 		}
-		httpx.ErrInternal(c, "failed to get")
-		return
-	}
-	if idx < 0 || idx >= len(list.Items) {
-		httpx.ErrBadRequest(c, "itemIndex out of range")
-		return
-	}
-	list.Items[idx].Checked = *req.Checked
-	updated, err := h.db.UpdateShoppingListItems(c.Request.Context(), id, userID, list.Items)
-	if err != nil {
+		var oor *queries.IndexOutOfRangeError
+		if errors.As(err, &oor) {
+			httpx.ErrBadRequest(c, "itemIndex out of range")
+			return
+		}
 		httpx.ErrInternal(c, "failed to update")
 		return
 	}

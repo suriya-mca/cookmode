@@ -52,13 +52,13 @@ func (h *postHandler) create(c *gin.Context) {
 		RecipeID    string `json:"recipe_id"`
 		PhotoURL    string `json:"photo_url"`
 		Caption     string `json:"caption"`
-		RatingValue int    `json:"rating_value"`
+		RatingValue *int   `json:"rating_value"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.RecipeID == "" || req.PhotoURL == "" {
 		httpx.ErrBadRequest(c, "recipe_id and photo_url are required")
 		return
 	}
-	if req.RatingValue < 0 || req.RatingValue > 5 {
+	if req.RatingValue != nil && (*req.RatingValue < 0 || *req.RatingValue > 5) {
 		httpx.ErrBadRequest(c, "rating_value must be 0-5")
 		return
 	}
@@ -66,12 +66,17 @@ func (h *postHandler) create(c *gin.Context) {
 		httpx.ErrBadRequest(c, "caption must be at most 500 characters")
 		return
 	}
-	if _, err := h.db.GetRecipe(c.Request.Context(), req.RecipeID); err != nil {
+	recipe, err := h.db.GetRecipe(c.Request.Context(), req.RecipeID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httpx.ErrNotFound(c, "recipe not found")
 			return
 		}
 		httpx.ErrInternal(c, "failed to get recipe")
+		return
+	}
+	if !isRecipeVisible(recipe, userID) {
+		httpx.ErrNotFound(c, "recipe not found")
 		return
 	}
 	post, err := h.db.CreatePost(c.Request.Context(), &models.Post{

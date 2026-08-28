@@ -26,7 +26,7 @@ type Post struct {
 	PhotoURL    string     `json:"photo_url"`
 	Caption     string     `json:"caption"`
 	Status      PostStatus `json:"status"`
-	RatingValue int        `json:"rating_value,omitempty"`
+	RatingValue *int       `json:"rating_value,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 

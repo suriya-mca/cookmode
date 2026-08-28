@@ -30,6 +30,9 @@ func main() {
 	defer pool.Close()
 
 	searchIndexer := services.NewSearchIndexer(cfg.MeiliHost, cfg.MeiliAPIKey)
+	if err := searchIndexer.EnsureIndex(ctx); err != nil {
+		log.Printf("search ensure index: %v", err)
+	}
 
 	riverClient, err := jobs.NewClient(pool, searchIndexer)
 	if err != nil {

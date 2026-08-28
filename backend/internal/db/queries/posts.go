@@ -10,13 +10,9 @@ import (
 
 func scanPost(row pgx.Row) (*models.Post, error) {
 	var p models.Post
-	var rating *int
-	err := row.Scan(&p.ID, &p.UserID, &p.RecipeID, &p.PhotoURL, &p.Caption, &p.Status, &rating, &p.CreatedAt)
+	err := row.Scan(&p.ID, &p.UserID, &p.RecipeID, &p.PhotoURL, &p.Caption, &p.Status, &p.RatingValue, &p.CreatedAt)
 	if err != nil {
 		return nil, err
-	}
-	if rating != nil {
-		p.RatingValue = *rating
 	}
 	return &p, nil
 }
@@ -25,15 +21,11 @@ func (db *DB) CreatePost(ctx context.Context, p *models.Post) (*models.Post, err
 	if err := db.ensureUser(ctx, p.UserID); err != nil {
 		return nil, err
 	}
-	var rating *int
-	if p.RatingValue != 0 {
-		rating = &p.RatingValue
-	}
 	row := db.Pool.QueryRow(ctx, `
 		INSERT INTO posts (user_id, recipe_id, photo_url, caption, rating_value)
 		VALUES ($1,$2,$3,$4,$5)
 		RETURNING id, user_id, recipe_id, photo_url, caption, status, rating_value, created_at
-	`, p.UserID, p.RecipeID, p.PhotoURL, p.Caption, rating)
+	`, p.UserID, p.RecipeID, p.PhotoURL, p.Caption, p.RatingValue)
 	return scanPost(row)
 }
 

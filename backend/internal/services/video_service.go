@@ -2,9 +2,11 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -19,7 +21,7 @@ func NewVideoService(accountID, apiToken string) *VideoService {
 	return &VideoService{
 		accountID: accountID,
 		apiToken:  apiToken,
-		client:    &http.Client{},
+		client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -34,7 +36,7 @@ type directUploadResponse struct {
 	} `json:"errors"`
 }
 
-func (s *VideoService) CreateDirectUploadURL() (string, string, error) {
+func (s *VideoService) CreateDirectUploadURL(ctx context.Context) (string, string, error) {
 	if s.accountID == "" || s.apiToken == "" || s.accountID == "your-cloudflare-account-id" {
 		uid := uuid.NewString()
 		return uid, fmt.Sprintf("https://dev.local/upload/%s", uid), nil
@@ -45,7 +47,7 @@ func (s *VideoService) CreateDirectUploadURL() (string, string, error) {
 		"expiry":             "2030-01-01T00:00:00Z",
 	})
 
-	req, err := http.NewRequest(http.MethodPost,
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/stream/direct_upload", s.accountID),
 		bytes.NewReader(body))
 	if err != nil {

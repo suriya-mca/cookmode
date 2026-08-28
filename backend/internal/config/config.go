@@ -11,7 +11,6 @@ type Config struct {
 	Port        string
 	DatabaseURL string
 
-	SupabaseURL       string
 	SupabaseJWTSecret string
 
 	MeiliHost   string
@@ -39,7 +38,6 @@ func Load() *Config {
 		Port:        getEnv("PORT", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 
-		SupabaseURL:       getEnv("SUPABASE_URL", ""),
 		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
 
 		MeiliHost:   getEnv("MEILI_HOST", "http://localhost:7700"),

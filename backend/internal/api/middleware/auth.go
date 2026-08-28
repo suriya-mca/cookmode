@@ -51,6 +51,33 @@ func (a *Auth) Middleware() gin.HandlerFunc {
 	}
 }
 
+func (a *Auth) Optional() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		token, ok := strings.CutPrefix(header, "Bearer ")
+		if !ok || token == "" {
+			c.Next()
+			return
+		}
+		parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("unexpected signing method")
+			}
+			return a.secret, nil
+		})
+		if err != nil || !parsed.Valid {
+			c.Next()
+			return
+		}
+		if claims, ok := parsed.Claims.(jwt.MapClaims); ok {
+			if sub, _ := claims["sub"].(string); sub != "" {
+				c.Set("user_id", sub)
+			}
+		}
+		c.Next()
+	}
+}
+
 // UserIDFrom returns the authenticated user id set by Auth.Middleware.
 func UserIDFrom(c *gin.Context) string {
 	v, _ := c.Get("user_id")

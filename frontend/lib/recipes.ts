@@ -13,7 +13,7 @@ export type Recipe = {
   difficulty: string;
   dietary_tags: string[];
   ingredients: { name: string; quantity: number; unit: string }[];
-  steps: { order: number; text: string; anchor_seconds: number }[];
+  steps: { order: number; text: string; anchor_seconds: number; duration_hint?: number }[];
   video_hls_url: string;
   video_thumbnail_url: string;
   saves: number;

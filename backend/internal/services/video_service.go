@@ -17,6 +17,7 @@ type VideoService struct {
 	client    *http.Client
 }
 
+// NewVideoService creates a VideoService with the specified Cloudflare account credentials and a 10-second HTTP client timeout.
 func NewVideoService(accountID, apiToken string) *VideoService {
 	return &VideoService{
 		accountID: accountID,

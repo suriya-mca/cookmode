@@ -8,6 +8,7 @@ import (
 	"cookmode/internal/models"
 )
 
+// scanPost scans a database row into a post and returns the post or a scan error.
 func scanPost(row pgx.Row) (*models.Post, error) {
 	var p models.Post
 	err := row.Scan(&p.ID, &p.UserID, &p.RecipeID, &p.PhotoURL, &p.Caption, &p.Status, &p.RatingValue, &p.CreatedAt)

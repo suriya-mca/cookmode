@@ -17,6 +17,7 @@ import (
 	"cookmode/internal/services"
 )
 
+// main loads application configuration, starts the database, search index, job client, and HTTP server, then shuts them down on termination signals.
 func main() {
 	cfg := config.Load()
 

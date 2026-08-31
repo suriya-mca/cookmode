@@ -2,6 +2,7 @@
   "expo": {
     "name": "CookMode",
     "slug": "cookmode",
+    "scheme": "cookmode",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -13,7 +14,8 @@
       "package": "com.cookmode.app"
     },
     "plugins": [
-      "expo-video"
+      "expo-video",
+      "expo-router"
     ]
   }
 }

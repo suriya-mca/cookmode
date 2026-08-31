@@ -16,48 +16,60 @@ posts, shopping lists, and ingredient-aware search.
 | Video     | Cloudflare Stream                             |
 | Auth      | Supabase Auth (JWT)                           |
 | Nutrition | Edamam (primary), USDA fallback               |
+| App       | Expo `~52` + `expo-router` + `gluestack-ui` + `UniWind` (Tailwind v4) |
 
 ## Monorepo layout
 
 ```
 backend/              Go API (branch: api)
 ├── cmd/
-│   ├── api/          main server
+│   ├── api/          main server (River start + EnsureIndex)
 │   └── migrate/      migration runner (embedded SQL)
 ├── internal/
-│   ├── api/          routes.go, handlers/, middleware/
-│   ├── config/       env loading
-│   ├── db/           pgx pool
-│   ├── jobs/         River workers (async pipeline)
-│   ├── models/       domain structs (mirror migrations)
-│   └── services/     business logic (video, nutrition, search)
-├── migrations/       SQL files (.up.sql / .down.sql pairs)
+│   ├── api/          routes.go, handlers/, middleware/ (auth.Optional)
+│   ├── config/       env loading (no SUPABASE_URL — only JWT secret)
+│   ├── db/           pgx pool + queries/ (recipes/saves/collections/follows/posts/shopping/forks)
+│   ├── httpx/        respond/validate/paginate + visibility helper
+│   ├── jobs/         River workers (process_video → index_recipe)
+│   ├── models/       domain structs (Post.RatingValue *int, Step.anchor_seconds float64)
+│   └── services/     video (10s timeout, context), search (mutex+quoteFilterValue), nutrition
+├── migrations/       SQL files (.up.sql / .down.sql pairs, 000001-000003 + pg_trgm)
 ├── pkg/              thin clients (Meilisearch, R2, Stream)
-├── docker-compose.yml  local Postgres + Meilisearch
+├── docker-compose.yml  local Postgres :5433 + Meilisearch :7700
 └── .env.example      template for backend/.env
 
-frontend/             React Native + Expo app (branch: ui)
+frontend/             Expo app (branch: ui, pnpm)
+├── app/
+│   ├── _layout.tsx          Root (Gluestack + SafeArea + Gesture + UniWind)
+│   ├── (tabs)/              Feed/Search/Add/Collections/Profile (5-tab)
+│   ├── recipe/[id].tsx      Detail (hero video + tabs)
+│   └── cook/[id].tsx        Cook Mode (full-screen anchors)
+├── components/ui/    gluestack-ui-provider (copy-paste)
+├── lib/theme.ts      palette from ui/*.jpeg (cream/terracotta/sage, Playfair/Inter, radius 20)
+├── global.css        @import tailwindcss; @import 'uniwind'
+├── pnpm-lock.yaml    (do not use npm)
+└── .serena/          language_servers: [typescript_vts] (vtsls)
+
 API_CONTRACT.md       REST API spec — shared with frontend team
 ```
 
 ## Local development
 
-Prerequisites: [Docker](https://docs.docker.com/get-docker/) and Go 1.27+.
+Prerequisites: [Docker](https://docs.docker.com/get-docker/), Go 1.27+, Node 24 + `pnpm`.
 
 ```sh
+# Backend
 cd backend
+docker compose up -d          # Postgres :5433 + Meilisearch :7700
+cp .env.example .env          # dev defaults already point at compose stack
+make migrate-up               # also runs rivermigrate for river_* tables
+make run                      # :8080 (logs "listening on :8080")
 
-# 1. Start Postgres (:5433) and Meilisearch (:7700)
-docker compose up -d
-
-# 2. Configure environment
-cp .env.example .env   # dev defaults already point at the compose stack
-
-# 3. Create tables
-make migrate-up
-
-# 4. Run the server on :8080
-make run
+# Frontend (separate terminal)
+cd frontend
+pnpm install
+pnpm start                    # or pnpm exec expo start -- --web
+pnpm exec tsc --noEmit --skipLibCheck  # typecheck
 ```
 
 Verify:
@@ -65,6 +77,7 @@ Verify:
 ```sh
 curl http://localhost:8080/api/v1/health
 # → {"status":"ok"}
+curl "http://localhost:8080/api/v1/search?q=garlic"
 ```
 
 ### Publishing and search
@@ -76,7 +89,7 @@ curl -X POST http://localhost:8080/api/v1/recipes/<id>/publish \
   -H "Authorization: Bearer <token>"
 ```
 
-Publishing also indexes the recipe in Meilisearch (`GET /search?q=...`). Video upload (`POST /recipes/upload-url`) sets `status=processing`; the publish step is manual until the Stream → transcribe → anchors pipeline is fully wired.
+Publishing also indexes the recipe in Meilisearch (`GET /search?q=...`). Video upload (`POST /recipes/upload-url` → `https://dev.local/upload/{uuid}` stub when `CF_*` empty) sets `status=processing`; the publish step is manual until the Stream → transcribe → anchors pipeline is fully wired.
 
 Notes:
 - CookMode's Postgres maps to host port **5433** (not the default 5432) to
@@ -91,18 +104,22 @@ Notes:
 cd backend
 go test ./...                          # all unit tests (no DB needed)
 go test ./internal/httpx -run TestValidateRecipe
+cd ../frontend
+pnpm exec tsc --noEmit --skipLibCheck
 ```
 
 ## Commands
 
-| Command             | Action                                    |
-|---------------------|-------------------------------------------|
-| `make run`          | Start the API server on :8080             |
-| `make test`         | Run all tests                             |
-| `make build`        | Build binary to `bin/api`                 |
-| `make migrate-up`   | Apply pending migrations                  |
-| `make migrate-down` | Roll back last migration                  |
-| `make tidy`         | Run `go mod tidy`                         |
+| Command             | Where     | Action                                    |
+|---------------------|-----------|-------------------------------------------|
+| `make run`          | `backend` | Start the API server on :8080             |
+| `make test`         | `backend` | `go test ./...`                           |
+| `make build`        | `backend` | Build binary to `bin/api`                 |
+| `make migrate-up`   | `backend` | Apply pending migrations                  |
+| `make migrate-down` | `backend` | Roll back last migration                  |
+| `make tidy`         | `backend` | Run `go mod tidy`                         |
+| `pnpm start`        | `frontend`| Expo dev server                           |
+| `pnpm exec tsc`     | `frontend`| Typecheck                                 |
 
 Single test: `go test ./internal/<pkg> -run TestName`
 
@@ -114,3 +131,10 @@ Single test: `go test ./internal/<pkg> -run TestName`
 | `dev`  | Integration                |
 | `api`  | Backend work               |
 | `ui`   | Frontend work              |
+```
+
+Work on `ui` for frontend (`pnpm`), `api` for backend (`go`). Both PR into `dev`, `dev` → `main` for releases:
+```sh
+git switch ui; git add frontend/; git commit -m "feat(ui): ..."; git push origin ui   # → PR ui → dev
+git switch api; git merge origin/dev; git add backend/; git commit; git push origin api # → PR api → dev
+```

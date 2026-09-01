@@ -63,3 +63,23 @@ export function useRemoveFromCollection() {
     },
   });
 }
+
+export function useUpdateCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; title?: string; description?: string; is_public?: boolean }) =>
+      api.patch<Collection>(`/collections/${id}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["collections"] });
+      qc.invalidateQueries({ queryKey: ["collection", vars.id] });
+    },
+  });
+}
+
+export function useDeleteCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/collections/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["collections"] }),
+  });
+}

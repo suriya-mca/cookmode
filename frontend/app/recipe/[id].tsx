@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useLocalSearchParams, Link, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { useState } from "react";
@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRecipe } from "@/lib/recipes";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { usePosts, useCreatePost } from "@/lib/social";
 import { theme } from "@/lib/theme";
 
 export default function RecipeDetail() {
@@ -15,9 +16,20 @@ export default function RecipeDetail() {
   const { session } = useAuth();
   const { data: r, isLoading } = useRecipe(id!);
   const [tab, setTab] = useState<"ingredients" | "steps" | "nutrition">("ingredients");
+  const { data: posts } = usePosts(id);
+  const createPost = useMutation({
+    mutationFn: (body: { photo_url: string; caption?: string }) =>
+      api.post(`/posts`, { recipe_id: id, photo_url: body.photo_url, caption: body.caption }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts", id] }),
+  });
+  const [postCaption, setPostCaption] = useState("");
 
   const save = useMutation({
     mutationFn: () => api.post(`/recipes/${id}/saves`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["recipe", id] }),
+  });
+  const unsave = useMutation({
+    mutationFn: () => api.del(`/recipes/${id}/saves`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["recipe", id] }),
   });
   const fork = useMutation({
@@ -27,6 +39,13 @@ export default function RecipeDetail() {
   const publish = useMutation({
     mutationFn: () => api.post(`/recipes/${id}/publish`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["recipe", id] }),
+  });
+  const archive = useMutation({
+    mutationFn: () => api.del(`/recipes/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recipes"] });
+      router.replace("/(tabs)");
+    },
   });
 
   if (isLoading) {
@@ -69,17 +88,44 @@ export default function RecipeDetail() {
           </Pressable>
           <Pressable
             onPress={() => (authed ? save.mutate() : Alert.alert("Sign in required"))}
-            style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 16, justifyContent: "center" }}
+            style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
           >
             <Text style={{ color: theme.colors.charcoal }}>Save</Text>
           </Pressable>
           <Pressable
+            onPress={() => (authed ? unsave.mutate() : Alert.alert("Sign in required"))}
+            style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
+          >
+            <Text style={{ color: theme.colors.charcoal }}>Unsave</Text>
+          </Pressable>
+          <Pressable
             onPress={() => (authed ? fork.mutate() : Alert.alert("Sign in required"))}
-            style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 16, justifyContent: "center" }}
+            style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
           >
             <Text style={{ color: theme.colors.charcoal }}>Fork</Text>
           </Pressable>
         </View>
+
+        {r.user_id === session?.user?.id && (
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Link href={`/recipe/edit/${id}`} asChild>
+              <Pressable style={{ flex: 1, borderWidth: 1, borderColor: theme.colors.sage, borderRadius: theme.radius.sm, padding: 12, alignItems: "center" }}>
+                <Text style={{ color: theme.colors.sage, fontWeight: "600" }}>Edit</Text>
+              </Pressable>
+            </Link>
+            <Pressable
+              onPress={() =>
+                Alert.alert("Archive?", "This will hide the recipe.", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Archive", style: "destructive", onPress: () => archive.mutate() },
+                ])
+              }
+              style={{ flex: 1, borderWidth: 1, borderColor: theme.colors.terracottaDark, borderRadius: theme.radius.sm, padding: 12, alignItems: "center" }}
+            >
+              <Text style={{ color: theme.colors.terracottaDark, fontWeight: "600" }}>Archive</Text>
+            </Pressable>
+          </View>
+        )}
 
         {r.user_id === session?.user?.id && r.status !== "published" && (
           <Pressable
@@ -140,6 +186,37 @@ export default function RecipeDetail() {
             <Text style={{ color: theme.colors.charcoalMuted, fontSize: 12 }}>{r.nutrition ? JSON.stringify(r.nutrition) : "Not calculated yet"}</Text>
           </View>
         )}
+
+        <View style={{ marginTop: 16, backgroundColor: theme.colors.card, borderRadius: theme.radius.md, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 8 }}>
+          <Text style={{ fontWeight: "600", color: theme.colors.charcoal }}>I made this • {posts?.length ?? 0}</Text>
+          {(posts ?? []).slice(0, 3).map((p: any) => (
+            <View key={p.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.colors.borderSoft }}>
+              <Text style={{ color: theme.colors.charcoal, fontWeight: "500" }}>{p.caption || "Made it!"}</Text>
+              <Text style={{ color: theme.colors.charcoalMuted, fontSize: 12 }}>{p.photo_url}</Text>
+            </View>
+          ))}
+          {authed && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+              <TextInput
+                placeholder="Caption (optional)"
+                value={postCaption}
+                onChangeText={setPostCaption}
+                style={{ flex: 1, backgroundColor: theme.colors.cream, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, padding: 10, color: theme.colors.charcoal, fontSize: 12 }}
+              />
+              <Pressable
+                onPress={() =>
+                  createPost.mutate(
+                    { photo_url: `https://r2.dev/${id}-${Date.now()}.jpg`, caption: postCaption },
+                    { onSuccess: () => setPostCaption("") }
+                  )
+                }
+                style={{ backgroundColor: theme.colors.sage, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
+              >
+                <Text style={{ color: theme.colors.card, fontWeight: "600", fontSize: 12 }}>Post</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
       </View>
     </ScrollView>
   );

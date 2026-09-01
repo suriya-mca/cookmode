@@ -47,3 +47,20 @@ export function usePosts(recipeId?: string, userId?: string) {
     enabled: !!qs,
   });
 }
+
+export function useCreatePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { recipe_id: string; photo_url: string; caption?: string; rating_value?: number }) =>
+      api.post("/posts", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
+  });
+}
+
+export function useDeletePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/posts/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
+  });
+}

@@ -42,3 +42,23 @@ export function useToggleShoppingItem() {
     },
   });
 }
+
+export function useDeleteShoppingList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/shopping-lists/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping-lists"] }),
+  });
+}
+
+export function useAddShoppingItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, items }: { id: string; items: { ingredient_name: string; quantity: number; unit: string }[] }) =>
+      api.post<ShoppingList>(`/shopping-lists/${id}/items`, { items }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["shopping-list", vars.id] });
+      qc.invalidateQueries({ queryKey: ["shopping-lists"] });
+    },
+  });
+}

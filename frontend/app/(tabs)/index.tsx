@@ -1,47 +1,9 @@
-import { View, Text, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { useState } from "react";
-import { useRecipes, useSearch, type Recipe } from "@/lib/recipes";
+import { useRecipes, type Recipe } from "@/lib/recipes";
 import { theme } from "@/lib/theme";
-
-const chips = ["All", "Italian", "Asian", "Vegan", "Under 30m"];
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: theme.radius.pill,
-        backgroundColor: active ? theme.colors.terracotta : theme.colors.card,
-        borderWidth: 1,
-        borderColor: active ? theme.colors.terracotta : theme.colors.border,
-        marginRight: 8,
-      }}
-    >
-      <Text
-        style={{
-          color: active ? theme.colors.card : theme.colors.charcoal,
-          fontSize: 13,
-          fontWeight: "500",
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 function RecipeCard({ r }: { r: Recipe }) {
   return (
@@ -85,75 +47,31 @@ function RecipeCard({ r }: { r: Recipe }) {
 }
 
 export default function FeedScreen() {
-  const [q, setQ] = useState("");
-  const [activeChip, setActiveChip] = useState("All");
-  const [searchQ, setSearchQ] = useState("");
-
-  const dietary = activeChip === "Vegan" ? "vegan" : undefined;
-  const cuisine = ["Italian", "Asian"].includes(activeChip) ? activeChip : undefined;
-  const maxTime = activeChip === "Under 30m" ? 30 : undefined;
-  const useSearchMode = !!searchQ || !!dietary || !!cuisine || !!maxTime;
-
   const recipesQuery = useRecipes(20);
-  const searchQuery = useSearch({
-    q: searchQ || undefined,
-    dietary,
-    cuisine,
-    max_total_time: maxTime,
-  });
+  const data: Recipe[] = recipesQuery.data?.pages.flatMap((p) => p.data) ?? [];
 
-  const data: Recipe[] = useSearchMode
-    ? (searchQuery.data?.hits ?? [])
-    : (recipesQuery.data?.pages.flatMap((p) => p.data) ?? []);
-
-  const isLoading = useSearchMode ? searchQuery.isLoading : recipesQuery.isLoading;
+  if (recipesQuery.isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.cream, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={theme.colors.terracotta} />
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.cream }}>
-      <View style={{ padding: theme.spacing.md, gap: 12, paddingTop: 48 }}>
-        <TextInput
-          placeholder="Search recipes, ingredients..."
-          placeholderTextColor={theme.colors.charcoalMuted}
-          value={q}
-          onChangeText={setQ}
-          onSubmitEditing={() => setSearchQ(q)}
-          returnKeyType="search"
-          style={{
-            backgroundColor: theme.colors.card,
-            borderRadius: theme.radius.pill,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            color: theme.colors.charcoal,
-          }}
-        />
-        <View style={{ flexDirection: "row" }}>
-          <FlashList
-            data={chips}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <Chip label={item} active={activeChip === item} onPress={() => setActiveChip(item)} />
-            )}
-          />
-        </View>
+    <View style={{ flex: 1, backgroundColor: theme.colors.cream, paddingTop: 48 }}>
+      <View style={{ padding: theme.spacing.md, paddingBottom: 8 }}>
+        <Text style={{ fontSize: theme.text.title, fontWeight: "700", color: theme.colors.charcoal }}>Discover</Text>
+        <Text style={{ color: theme.colors.charcoalMuted, marginTop: 4 }}>Published recipes • pull to refresh</Text>
       </View>
-
-      {isLoading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={theme.colors.terracotta} />
-        </View>
-      ) : (
-        <FlashList
-          data={data}
-          contentContainerStyle={{ padding: 16, paddingTop: 0 }}
-          renderItem={({ item }) => <RecipeCard r={item} />}
-          onEndReached={() => {
-            if (!useSearchMode && recipesQuery.hasNextPage) recipesQuery.fetchNextPage();
-          }}
-        />
-      )}
+      <FlashList
+        data={data}
+        contentContainerStyle={{ padding: 16, paddingTop: 0 }}
+        renderItem={({ item }) => <RecipeCard r={item} />}
+        onEndReached={() => {
+          if (recipesQuery.hasNextPage) recipesQuery.fetchNextPage();
+        }}
+      />
     </View>
   );
 }

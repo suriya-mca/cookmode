@@ -58,10 +58,17 @@ export function useSearch(params: {
   if (params.cuisine) qs.set("cuisine", params.cuisine);
   if (params.max_total_time) qs.set("max_total_time", String(params.max_total_time));
   const qstr = qs.toString();
+  const hasFilter =
+    !!params.q ||
+    !!params.ingredients ||
+    !!params.dietary ||
+    !!params.difficulty ||
+    !!params.cuisine ||
+    !!params.max_total_time;
   return useQuery({
     queryKey: ["search", qstr],
     queryFn: () =>
       apiFetch<{ hits: Recipe[] }>(`/search?${qstr}`),
-    enabled: !!params.q || !!params.ingredients || !!params.dietary,
+    enabled: hasFilter,
   });
 }

@@ -70,40 +70,23 @@ func (h *userHandler) updateMe(c *gin.Context) {
 		httpx.ErrBadRequest(c, "invalid body")
 		return
 	}
-	existing, err := h.db.GetUser(c.Request.Context(), userID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		httpx.ErrInternal(c, "failed to get user")
-		return
-	}
-	if existing == nil {
-		existing = &models.User{ID: userID}
-	}
 	if req.Username != nil {
 		u := strings.TrimSpace(*req.Username)
-		if u == "" {
-			existing.Username = ""
-		} else {
+		if u != "" {
 			if len(u) < 3 || len(u) > 30 {
 				httpx.ErrBadRequest(c, "username must be 3-30 characters")
 				return
 			}
-			existing.Username = u
 		}
-	}
-	if req.DisplayName != nil {
-		existing.DisplayName = *req.DisplayName
-	}
-	if req.AvatarURL != nil {
-		existing.AvatarURL = *req.AvatarURL
+		req.Username = &u
 	}
 	if req.Bio != nil {
 		if len(*req.Bio) > 500 {
 			httpx.ErrBadRequest(c, "bio must be at most 500 characters")
 			return
 		}
-		existing.Bio = *req.Bio
 	}
-	updated, err := h.db.UpsertUser(c.Request.Context(), existing)
+	updated, err := h.db.PatchUser(c.Request.Context(), userID, req.Username, req.DisplayName, req.AvatarURL, req.Bio)
 	if err != nil {
 		log.Printf("upsert user error: %v", err)
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {

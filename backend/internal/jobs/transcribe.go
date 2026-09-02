@@ -32,7 +32,8 @@ func (w *TranscribeWorker) Work(ctx context.Context, job *river.Job[TranscribeAr
 	_, err := w.Pool.Exec(ctx, `
 		INSERT INTO recipe_transcripts (recipe_id, segments, raw_text, source)
 		VALUES ($1, $2::jsonb, $3, 'ai')
-		ON CONFLICT (recipe_id) DO UPDATE SET segments = EXCLUDED.segments, raw_text = EXCLUDED.raw_text, updated_at = now()
+		ON CONFLICT (recipe_id) DO UPDATE SET segments = EXCLUDED.segments, raw_text = EXCLUDED.raw_text, source = EXCLUDED.source, updated_at = now()
+		WHERE recipe_transcripts.source <> 'manual'
 	`, job.Args.RecipeID, string(b), raw)
 	return err
 }

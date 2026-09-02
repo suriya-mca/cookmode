@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -81,10 +80,10 @@ func (h *recipeHandler) get(c *gin.Context) {
 			return
 		}
 	}
-	go func() {
-		_, _ = h.pool.Exec(context.Background(), `UPDATE recipes SET views = views + 1 WHERE id=$1`, id)
-	}()
-	recipe.Views++
+	if err := h.pool.QueryRow(c.Request.Context(), `UPDATE recipes SET views = views + 1 WHERE id=$1 RETURNING views`, id).Scan(&recipe.Views); err != nil {
+		httpx.ErrInternal(c, "failed to update recipe views")
+		return
+	}
 	c.JSON(http.StatusOK, recipe)
 }
 

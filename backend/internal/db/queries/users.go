@@ -40,13 +40,17 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 	return scanUser(row)
 }
 
-func (db *DB) UpsertUser(ctx context.Context, u *models.User) (*models.User, error) {
+func (db *DB) PatchUser(ctx context.Context, id string, username, displayName, avatarURL, bio *string) (*models.User, error) {
 	row := db.Pool.QueryRow(ctx, `
 		INSERT INTO users (id, username, display_name, avatar_url, bio)
-		VALUES ($1,$2,$3,$4,$5)
-		ON CONFLICT (id) DO UPDATE SET username=EXCLUDED.username, display_name=EXCLUDED.display_name, avatar_url=EXCLUDED.avatar_url, bio=EXCLUDED.bio
+		VALUES ($1, NULLIF($2::text, ''), COALESCE($3::text, ''), COALESCE($4::text, ''), COALESCE($5::text, ''))
+		ON CONFLICT (id) DO UPDATE SET
+			username = CASE WHEN $6 THEN EXCLUDED.username ELSE users.username END,
+			display_name = CASE WHEN $7 THEN EXCLUDED.display_name ELSE users.display_name END,
+			avatar_url = CASE WHEN $8 THEN EXCLUDED.avatar_url ELSE users.avatar_url END,
+			bio = CASE WHEN $9 THEN EXCLUDED.bio ELSE users.bio END
 		RETURNING id, username, display_name, avatar_url, bio, created_at, updated_at
-	`, u.ID, nilIfEmpty(u.Username), u.DisplayName, u.AvatarURL, u.Bio)
+	`, id, username, displayName, avatarURL, bio, username != nil, displayName != nil, avatarURL != nil, bio != nil)
 	return scanUser(row)
 }
 

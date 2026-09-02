@@ -16,6 +16,7 @@ import (
 	"cookmode/internal/models"
 )
 
+// RegisterUsers registers authenticated current-user endpoints and a public user lookup endpoint.
 func RegisterUsers(rg *gin.RouterGroup, pool *pgxpool.Pool, auth *middleware.Auth) {
 	h := &userHandler{db: queries.New(pool)}
 	me := rg.Group("/users/me", auth.Middleware())

@@ -14,7 +14,7 @@ import (
 
 // Workers returns all River workers for registration. The pipeline order is:
 //
-//	process_video -> transcribe -> infer_anchors -> fetch_nutrition + index_recipe
+// Workers creates a River worker registry containing the video processing, transcription, anchor inference, nutrition fetching, and recipe indexing workers.
 func Workers(pool *pgxpool.Pool, indexer *services.SearchIndexer) *river.Workers {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &ProcessVideoWorker{Pool: pool})

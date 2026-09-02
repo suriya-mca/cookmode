@@ -17,6 +17,7 @@ import (
 	"cookmode/internal/services"
 )
 
+// main initializes the database pool, River client, HTTP server, and application context, then shuts them down on termination signals.
 func main() {
 	cfg := config.Load()
 

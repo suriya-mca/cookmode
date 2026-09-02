@@ -10,6 +10,10 @@ import (
 	"cookmode/internal/services"
 )
 
+// RegisterSearch registers the GET /search endpoint on rg using indexer.
+// The endpoint supports search filters and pagination, defaults to a limit of 20
+// and an offset of 0, returns a bad-request response for invalid time values,
+// and returns search results as JSON.
 func RegisterSearch(rg *gin.RouterGroup, indexer *services.SearchIndexer) {
 	rg.GET("/search", func(c *gin.Context) {
 		q := c.Query("q")

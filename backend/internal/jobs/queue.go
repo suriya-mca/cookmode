@@ -17,9 +17,9 @@ import (
 //	process_video -> transcribe -> infer_anchors -> fetch_nutrition + index_recipe
 func Workers(pool *pgxpool.Pool, indexer *services.SearchIndexer) *river.Workers {
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &ProcessVideoWorker{})
-	river.AddWorker(workers, &TranscribeWorker{})
-	river.AddWorker(workers, &InferAnchorsWorker{})
+	river.AddWorker(workers, &ProcessVideoWorker{Pool: pool})
+	river.AddWorker(workers, &TranscribeWorker{Pool: pool})
+	river.AddWorker(workers, &InferAnchorsWorker{Pool: pool})
 	river.AddWorker(workers, &FetchNutritionWorker{})
 	river.AddWorker(workers, &IndexRecipeWorker{Pool: pool, Indexer: indexer})
 	return workers

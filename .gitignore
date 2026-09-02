@@ -9,3 +9,6 @@ vendor/
 .idea/
 .vscode/
 .DS_Store
+
+# Self
+TODO.md

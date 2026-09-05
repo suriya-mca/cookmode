@@ -53,6 +53,7 @@ func main() {
 		SearchIndexer:    searchIndexer,
 		VideoService:     services.NewVideoService(cfg.CFStreamAccountID, cfg.CFStreamAPIToken),
 		NutritionService: services.NewNutritionService(cfg.EdamamAppID, cfg.EdamamAppKey, cfg.USDAAPIKey),
+		River:            riverClient,
 		JWTSecret:        cfg.SupabaseJWTSecret,
 	})
 

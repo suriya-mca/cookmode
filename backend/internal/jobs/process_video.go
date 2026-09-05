@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 )
@@ -33,5 +34,12 @@ func (w *ProcessVideoWorker) Work(ctx context.Context, job *river.Job[ProcessVid
 		120.0,
 		job.Args.RecipeID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if client := river.ClientFromContext[pgx.Tx](ctx); client != nil {
+		_, err = client.Insert(ctx, TranscribeArgs{RecipeID: job.Args.RecipeID, VideoUID: job.Args.VideoUID}, nil)
+		return err
+	}
+	return nil
 }

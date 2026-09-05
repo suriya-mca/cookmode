@@ -2,7 +2,9 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 
 	"cookmode/internal/api/handlers"
 	"cookmode/internal/api/middleware"
@@ -15,6 +17,7 @@ type Deps struct {
 	SearchIndexer    *services.SearchIndexer
 	VideoService     *services.VideoService
 	NutritionService *services.NutritionService
+	River            *river.Client[pgx.Tx]
 	JWTSecret        string
 }
 
@@ -27,7 +30,7 @@ func NewRouter(d Deps) *gin.Engine {
 	v1 := router.Group("/api/v1")
 	handlers.RegisterHealth(v1)
 	handlers.RegisterUsers(v1, d.Pool, auth)
-	handlers.RegisterRecipes(v1, d.Pool, d.SearchIndexer, d.VideoService, auth)
+	handlers.RegisterRecipes(v1, d.Pool, d.SearchIndexer, d.VideoService, d.River, auth)
 	handlers.RegisterCollections(v1, d.Pool, auth)
 	handlers.RegisterFollows(v1, d.Pool, auth)
 	handlers.RegisterPosts(v1, d.Pool, auth)

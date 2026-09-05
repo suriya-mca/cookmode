@@ -9,10 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 
 	"cookmode/internal/api/middleware"
 	"cookmode/internal/db/queries"
 	"cookmode/internal/httpx"
+	"cookmode/internal/jobs"
 	"cookmode/internal/models"
 	"cookmode/internal/services"
 )
@@ -22,9 +24,10 @@ func RegisterRecipes(
 	pool *pgxpool.Pool,
 	indexer *services.SearchIndexer,
 	video *services.VideoService,
+	riverClient *river.Client[pgx.Tx],
 	auth *middleware.Auth,
 ) {
-	h := &recipeHandler{db: queries.New(pool), pool: pool, indexer: indexer, video: video}
+	h := &recipeHandler{db: queries.New(pool), pool: pool, indexer: indexer, video: video, river: riverClient}
 
 	recipes := rg.Group("/recipes")
 	{
@@ -50,6 +53,7 @@ type recipeHandler struct {
 	pool    *pgxpool.Pool
 	indexer *services.SearchIndexer
 	video   *services.VideoService
+	river   *river.Client[pgx.Tx]
 }
 
 func (h *recipeHandler) list(c *gin.Context) {
@@ -305,6 +309,12 @@ func (h *recipeHandler) uploadURL(c *gin.Context) {
 	if err != nil {
 		httpx.ErrInternal(c, "failed to update recipe")
 		return
+	}
+	if h.river != nil {
+		if _, err := h.river.Insert(c.Request.Context(), jobs.ProcessVideoArgs{RecipeID: req.RecipeID, VideoUID: uid}, nil); err != nil {
+			httpx.ErrInternal(c, "failed to enqueue video processing")
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"video_uid":  uid,

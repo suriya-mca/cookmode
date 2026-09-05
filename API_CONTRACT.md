@@ -25,8 +25,8 @@ Recipe object: `id, user_id, title, description, cuisine, prep_time_min, cook_ti
 | POST | `/recipes/:id/saves` | 🔒 | Bookmark recipe (idempotent). Draft saves allowed only for owner; archived → 400; otherwise 404 if not readable |
 | DELETE | `/recipes/:id/saves` | 🔒 | Remove bookmark |
 | POST | `/recipes/:id/fork` | 🔒 | Clone recipe as new draft owned by caller; inserts `recipe_forks` link. Published always forkable; draft forkable only by owner; archived → 400 |
-| POST | `/recipes/upload-url` | 🔒 | Body `{ recipe_id }`. Generates Cloudflare Stream direct-upload URL (dev stub `https://dev.local/upload/{uid}` when `CF_*` empty). Sets `video_uid`; `draft|processing → processing`, `published` stays `published`. Owner only, archived → 400 |
-| POST | `/recipes/:id/publish` | 🔒 | Publish own recipe (`draft|processing → published`). Triggers Meilisearch indexing (sync; index errors are swallowed, recipe stays published). Owner only |
+| POST | `/recipes/upload-url` | 🔒 | Body `{ recipe_id }`. Generates Cloudflare Stream direct-upload URL (dev stub `https://dev.local/upload/{uid}` when `CF_*` empty). Sets `video_uid`; `draft\|processing → processing`, `published` stays `published`. Owner only, archived → 400 |
+| POST | `/recipes/:id/publish` | 🔒 | Publish own recipe (`draft\|processing → published`). Triggers Meilisearch indexing (sync; index errors are swallowed, recipe stays published). Owner only |
 
 Async pipeline (dev stubs until `CF_*` + LLM configured): `process_video → transcribe → infer_anchors` auto-chain via River (`fetch_nutrition` is a no-op — nutrition skipped). While `processing`, `steps[].anchor_seconds` may be 0/absent.
 

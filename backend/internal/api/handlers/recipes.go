@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -305,16 +306,34 @@ func (h *recipeHandler) uploadURL(c *gin.Context) {
 	if status != models.StatusPublished {
 		status = models.StatusProcessing
 	}
-	updated, err := h.db.SetRecipeVideo(c.Request.Context(), req.RecipeID, uid, string(status))
+	if h.river == nil {
+		httpx.ErrInternal(c, "video processing unavailable")
+		return
+	}
+	ctx := c.Request.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		httpx.ErrInternal(c, "failed to start recipe update")
+		return
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	updated, err := h.db.SetRecipeVideo(ctx, tx, req.RecipeID, uid, string(status))
 	if err != nil {
 		httpx.ErrInternal(c, "failed to update recipe")
 		return
 	}
-	if h.river != nil {
-		if _, err := h.river.Insert(c.Request.Context(), jobs.ProcessVideoArgs{RecipeID: req.RecipeID, VideoUID: uid}, nil); err != nil {
-			httpx.ErrInternal(c, "failed to enqueue video processing")
-			return
-		}
+	if _, err := h.river.InsertTx(ctx, tx, jobs.ProcessVideoArgs{RecipeID: req.RecipeID, VideoUID: uid}, nil); err != nil {
+		httpx.ErrInternal(c, "failed to enqueue video processing")
+		return
+	}
+	if err := ctx.Err(); err != nil {
+		httpx.ErrInternal(c, "request canceled")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		httpx.ErrInternal(c, "failed to commit recipe update")
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"video_uid":  uid,

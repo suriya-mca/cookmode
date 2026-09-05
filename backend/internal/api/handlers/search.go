@@ -13,7 +13,10 @@ import (
 // RegisterSearch registers the GET /search endpoint on rg using indexer.
 // The endpoint supports search filters and pagination, defaults to a limit of 20
 // and an offset of 0, returns a bad-request response for invalid time values,
-// and returns search results as JSON.
+// RegisterSearch registers a GET /search endpoint that returns filtered, paginated search results as JSON.
+// It supports query, ingredient, dietary, difficulty, cuisine, and maximum-time filters, with default
+// pagination of 20 results and offset 0. Invalid maximum-time values produce a 400 response, and search
+// failures produce a 500 response.
 func RegisterSearch(rg *gin.RouterGroup, indexer *services.SearchIndexer) {
 	rg.GET("/search", func(c *gin.Context) {
 		q := c.Query("q")

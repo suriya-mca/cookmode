@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,10 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 
 	"cookmode/internal/api/middleware"
 	"cookmode/internal/db/queries"
 	"cookmode/internal/httpx"
+	"cookmode/internal/jobs"
 	"cookmode/internal/models"
 	"cookmode/internal/services"
 )
@@ -22,9 +25,10 @@ func RegisterRecipes(
 	pool *pgxpool.Pool,
 	indexer *services.SearchIndexer,
 	video *services.VideoService,
+	riverClient *river.Client[pgx.Tx],
 	auth *middleware.Auth,
 ) {
-	h := &recipeHandler{db: queries.New(pool), pool: pool, indexer: indexer, video: video}
+	h := &recipeHandler{db: queries.New(pool), pool: pool, indexer: indexer, video: video, river: riverClient}
 
 	recipes := rg.Group("/recipes")
 	{
@@ -50,6 +54,7 @@ type recipeHandler struct {
 	pool    *pgxpool.Pool
 	indexer *services.SearchIndexer
 	video   *services.VideoService
+	river   *river.Client[pgx.Tx]
 }
 
 func (h *recipeHandler) list(c *gin.Context) {
@@ -301,9 +306,33 @@ func (h *recipeHandler) uploadURL(c *gin.Context) {
 	if status != models.StatusPublished {
 		status = models.StatusProcessing
 	}
-	updated, err := h.db.SetRecipeVideo(c.Request.Context(), req.RecipeID, uid, string(status))
+	if h.river == nil {
+		httpx.ErrInternal(c, "video processing unavailable")
+		return
+	}
+	ctx := c.Request.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		httpx.ErrInternal(c, "failed to start recipe update")
+		return
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	updated, err := h.db.SetRecipeVideo(ctx, tx, req.RecipeID, uid, string(status))
 	if err != nil {
 		httpx.ErrInternal(c, "failed to update recipe")
+		return
+	}
+	if _, err := h.river.InsertTx(ctx, tx, jobs.ProcessVideoArgs{RecipeID: req.RecipeID, VideoUID: uid}, nil); err != nil {
+		httpx.ErrInternal(c, "failed to enqueue video processing")
+		return
+	}
+	if err := ctx.Err(); err != nil {
+		httpx.ErrInternal(c, "request canceled")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		httpx.ErrInternal(c, "failed to commit recipe update")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

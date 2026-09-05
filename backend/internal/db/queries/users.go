@@ -8,6 +8,8 @@ import (
 	"cookmode/internal/models"
 )
 
+// scanUser converts a database row into a user model, preserving zero values for nullable fields.
+// It returns any row scanning error unchanged.
 func scanUser(row pgx.Row) (*models.User, error) {
 	var u models.User
 	var username, displayName, avatarURL, bio *string
@@ -63,6 +65,7 @@ func (db *DB) UpdateUser(ctx context.Context, u *models.User) (*models.User, err
 	return scanUser(row)
 }
 
+// nilIfEmpty returns nil for an empty string and the original string otherwise.
 func nilIfEmpty(s string) interface{} {
 	if s == "" {
 		return nil

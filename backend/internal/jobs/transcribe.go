@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 )
@@ -35,5 +36,12 @@ func (w *TranscribeWorker) Work(ctx context.Context, job *river.Job[TranscribeAr
 		ON CONFLICT (recipe_id) DO UPDATE SET segments = EXCLUDED.segments, raw_text = EXCLUDED.raw_text, source = EXCLUDED.source, updated_at = now()
 		WHERE recipe_transcripts.source <> 'manual'
 	`, job.Args.RecipeID, string(b), raw)
-	return err
+	if err != nil {
+		return err
+	}
+	if client := river.ClientFromContext[pgx.Tx](ctx); client != nil {
+		_, err = client.Insert(ctx, InferAnchorsArgs{RecipeID: job.Args.RecipeID}, nil)
+		return err
+	}
+	return nil
 }

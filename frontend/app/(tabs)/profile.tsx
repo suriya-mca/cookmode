@@ -36,9 +36,9 @@ export default function ProfileScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.cream, padding: 16, paddingTop: 48, gap: 16 }}>
       <View style={{ alignItems: "center", gap: 8 }}>
         <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.border, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 28, fontWeight: "700", color: theme.colors.charcoal }}>{user?.email?.[0]?.toUpperCase() ?? "U"}</Text>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: theme.colors.charcoal }}>{(user?.username?.[0] ?? user?.display_name?.[0] ?? "U").toUpperCase()}</Text>
         </View>
-        <Text style={{ fontSize: theme.text.subtitle, fontWeight: "700", color: theme.colors.charcoal }}>{user?.email}</Text>
+        <Text style={{ fontSize: theme.text.subtitle, fontWeight: "700", color: theme.colors.charcoal }}>{user?.username ?? user?.display_name ?? "User"}</Text>
         <Text style={{ color: theme.colors.charcoalMuted, fontSize: 12 }}>
           {followers?.length ?? 0} Followers • {following?.length ?? 0} Following • {posts?.length ?? 0} Made
         </Text>

@@ -1,41 +1,65 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { supabase } from "@/lib/api";
+import { api, tokenStore } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { theme } from "@/lib/theme";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const { refresh } = useAuth();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const signIn = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      Alert.alert("Login failed", error.message);
+    if (!username.trim() || !password) {
+      Alert.alert("Missing fields", "Username and password are required");
       return;
     }
-    router.replace("/(tabs)");
+    setLoading(true);
+    try {
+      const res = await api.post<{ token: string; user: unknown }>("/auth/login", {
+        username: username.trim(),
+        password,
+      });
+      await tokenStore.setToken(res.token, res.user);
+      await refresh();
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      Alert.alert("Login failed", e.message ?? "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      Alert.alert("Sign up failed", error.message);
+    if (!username.trim() || !password) {
+      Alert.alert("Missing fields", "Username and password are required");
       return;
     }
-    Alert.alert("Check email", "Confirm your email to continue.");
+    if (username.trim().length < 3 || username.trim().length > 30) {
+      Alert.alert("Invalid username", "Username must be 3-30 characters");
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert("Invalid password", "Password must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post<{ token: string; user: unknown }>("/auth/signup", {
+        username: username.trim(),
+        password,
+      });
+      await tokenStore.setToken(res.token, res.user);
+      await refresh();
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      Alert.alert("Sign up failed", e.message ?? "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,12 +94,11 @@ export default function LoginScreen() {
       </Text>
 
       <TextInput
-        placeholder="Email"
+        placeholder="Username"
         placeholderTextColor={theme.colors.charcoalMuted}
         autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        value={username}
+        onChangeText={setUsername}
         style={{
           backgroundColor: theme.colors.card,
           borderWidth: 1,

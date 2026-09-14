@@ -15,7 +15,9 @@
     },
     "plugins": [
       "expo-video",
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
     ]
   }
 }

@@ -16,7 +16,7 @@ export default function CookMode() {
   const [stepIdx, setStepIdx] = useState(0);
   const [timerSec, setTimerSec] = useState<number | null>(null);
   const sheetRef = useRef<BottomSheet>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useKeepAwake();
 

@@ -5,47 +5,73 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "./api";
+import { tokenStore, api } from "./api";
+
+type User = {
+  id: string;
+  username: string;
+  display_name?: string;
+};
 
 type AuthState = {
-  session: Session | null;
   user: User | null;
+  session: { access_token: string } | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>({
-  session: null,
   user: null,
+  session: null,
   loading: true,
   signOut: async () => {},
+  refresh: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<{ access_token: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+  const refresh = async () => {
+    const token = await tokenStore.getToken();
+    if (!token) {
+      setUser(null);
+      setSession(null);
       setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event, sess) => setSession(sess)
-    );
-    return () => sub.subscription.unsubscribe();
+      return;
+    }
+    const storedUser = await tokenStore.getUser<User>();
+    if (storedUser) {
+      setUser(storedUser);
+      setSession({ access_token: token });
+    } else {
+      try {
+        const fetched = await api.get<User>("/users/me");
+        setUser(fetched);
+        setSession({ access_token: token });
+      } catch {
+        await tokenStore.clear();
+        setUser(null);
+        setSession(null);
+      }
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refresh();
   }, []);
 
+  const signOut = async () => {
+    await tokenStore.clear();
+    setUser(null);
+    setSession(null);
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        session,
-        user: session?.user ?? null,
-        loading,
-        signOut: () => supabase.auth.signOut().then(() => undefined),
-      }}
-    >
+    <AuthContext.Provider value={{ user, session, loading, signOut, refresh }}>
       {children}
     </AuthContext.Provider>
   );

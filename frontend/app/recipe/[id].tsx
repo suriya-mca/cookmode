@@ -13,7 +13,7 @@ export default function RecipeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const { data: r, isLoading } = useRecipe(id!);
   const [tab, setTab] = useState<"ingredients" | "steps" | "nutrition">("ingredients");
   const { data: posts } = usePosts(id);
@@ -106,7 +106,7 @@ export default function RecipeDetail() {
           </Pressable>
         </View>
 
-        {r.user_id === session?.user?.id && (
+        {r.user_id === user?.id && (
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Link href={`/recipe/edit/${id}`} asChild>
               <Pressable style={{ flex: 1, borderWidth: 1, borderColor: theme.colors.sage, borderRadius: theme.radius.sm, padding: 12, alignItems: "center" }}>
@@ -127,7 +127,7 @@ export default function RecipeDetail() {
           </View>
         )}
 
-        {r.user_id === session?.user?.id && r.status !== "published" && (
+        {r.user_id === user?.id && r.status !== "published" && (
           <Pressable
             onPress={() => publish.mutate()}
             style={{ backgroundColor: theme.colors.sage, borderRadius: theme.radius.sm, padding: 12, alignItems: "center" }}

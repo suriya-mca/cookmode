@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -76,6 +77,19 @@ func (a *Auth) Optional() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// IssueToken creates a HS256 JWT for the given userID using the same secret
+// that Middleware() verifies. This keeps hand-minted tokens and Supabase-historical
+// tokens compatible.
+func (a *Auth) IssueToken(userID string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub": userID,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(7 * 24 * time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(a.secret)
 }
 
 // UserIDFrom returns the authenticated user id set by Auth.Middleware.

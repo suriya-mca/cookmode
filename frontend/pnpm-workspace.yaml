@@ -1,0 +1,8 @@
+packages:
+  - "."
+
+overrides:
+  metro: 0.84.5
+  metro-cache: 0.84.5
+  metro-transform-worker: 0.84.5
+  "@expo/metro-config": 57.0.12

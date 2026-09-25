@@ -22,6 +22,7 @@ type Auth struct {
 	secret []byte
 }
 
+// NewAuth creates a token issuer and verifier using the configured signing secret.
 func NewAuth(secret string) *Auth {
 	return &Auth{secret: []byte(secret)}
 }
@@ -46,6 +47,7 @@ func (a *Auth) parse(token string) (string, error) {
 	return sub, nil
 }
 
+// Middleware requires a valid bearer token and stores its user ID in the context.
 func (a *Auth) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")

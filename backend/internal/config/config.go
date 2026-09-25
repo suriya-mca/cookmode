@@ -66,6 +66,7 @@ type Config struct {
 	USDAAPIKey   string
 }
 
+// Load reads application settings from the environment, with local defaults.
 func Load() *Config {
 	if err := godotenv.Load(); err != nil {
 		log.Println("no .env file found, relying on environment")

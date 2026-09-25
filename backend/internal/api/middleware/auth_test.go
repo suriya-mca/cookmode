@@ -13,6 +13,7 @@ import (
 
 const testSecret = "test-secret-that-is-long-enough-32-chars"
 
+// init sets Gin to test mode before middleware tests create contexts.
 func init() {
 	gin.SetMode(gin.TestMode)
 }
@@ -31,6 +32,7 @@ func runThrough(h gin.HandlerFunc, bearer string) (*httptest.ResponseRecorder, *
 	return w, c
 }
 
+// mint signs a test token with the requested algorithm, secret, and claims.
 func mint(t *testing.T, method jwt.SigningMethod, secret string, claims jwt.MapClaims) string {
 	t.Helper()
 	token := jwt.NewWithClaims(method, claims)
@@ -41,6 +43,7 @@ func mint(t *testing.T, method jwt.SigningMethod, secret string, claims jwt.MapC
 	return s
 }
 
+// validClaims returns unexpired JWT claims for a given subject.
 func validClaims(sub string) jwt.MapClaims {
 	return jwt.MapClaims{
 		"sub": sub,
@@ -49,6 +52,7 @@ func validClaims(sub string) jwt.MapClaims {
 	}
 }
 
+// TestIssueTokenRoundTrip checks that an issued token parses to its user ID.
 func TestIssueTokenRoundTrip(t *testing.T) {
 	a := NewAuth(testSecret)
 	id := uuid.NewString()
@@ -65,6 +69,7 @@ func TestIssueTokenRoundTrip(t *testing.T) {
 	}
 }
 
+// TestIssueTokenTTL checks the expiry interval encoded in an issued token.
 func TestIssueTokenTTL(t *testing.T) {
 	a := NewAuth(testSecret)
 	token, err := a.IssueToken(uuid.NewString())
@@ -82,6 +87,7 @@ func TestIssueTokenTTL(t *testing.T) {
 	}
 }
 
+// TestMiddlewareStrict checks acceptance of valid tokens and rejection of invalid ones.
 func TestMiddlewareStrict(t *testing.T) {
 	a := NewAuth(testSecret)
 	id := uuid.NewString()
@@ -116,6 +122,7 @@ func TestMiddlewareStrict(t *testing.T) {
 	}
 }
 
+// TestOptional checks anonymous access and rejection of invalid supplied tokens.
 func TestOptional(t *testing.T) {
 	a := NewAuth(testSecret)
 	id := uuid.NewString()
@@ -143,6 +150,7 @@ func TestOptional(t *testing.T) {
 	}
 }
 
+// TestCORS checks allowed and unlisted origins, preflight, and wildcard access.
 func TestCORS(t *testing.T) {
 	h := CORS([]string{"http://localhost:8081"})
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestValidate checks rejection of weak JWT secrets and acceptance of valid ones.
 func TestValidate(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -29,6 +30,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+// TestValidateEmptyNamesNewVar checks that a missing secret names JWT_SECRET.
 func TestValidateEmptyNamesNewVar(t *testing.T) {
 	err := (&Config{}).Validate()
 	if err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
@@ -36,6 +38,7 @@ func TestValidateEmptyNamesNewVar(t *testing.T) {
 	}
 }
 
+// TestCORSAllowOrigins checks splitting and trimming of the configured origins.
 func TestCORSAllowOrigins(t *testing.T) {
 	c := &Config{CORSAllowOriginsRaw: "http://localhost:8081, https://app.cookmode.dev "}
 	got := c.CORSAllowOrigins()

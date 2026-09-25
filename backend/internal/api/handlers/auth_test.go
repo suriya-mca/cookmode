@@ -47,6 +47,7 @@ func testRouter(t *testing.T) (*gin.Engine, *pgxpool.Pool) {
 	return router, pool
 }
 
+// doJSON sends a JSON request through the test router with an optional bearer token.
 func doJSON(t *testing.T, router *gin.Engine, method, path string, body any, token string) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
@@ -65,6 +66,7 @@ func doJSON(t *testing.T, router *gin.Engine, method, path string, body any, tok
 	return w
 }
 
+// decodeBody decodes a recorded JSON response and fails the test on invalid JSON.
 func decodeBody(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 	t.Helper()
 	var m map[string]any
@@ -83,11 +85,13 @@ func uniqueUsername(t *testing.T, pool *pgxpool.Pool) string {
 	return u
 }
 
+// deleteUser removes a test account by username during cleanup.
 func deleteUser(t *testing.T, pool *pgxpool.Pool, username string) {
 	t.Helper()
 	_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE username=$1", username)
 }
 
+// TestSignupLoginFlow covers signup, duplicate signup, login, and failed logins.
 func TestSignupLoginFlow(t *testing.T) {
 	router, pool := testRouter(t)
 	username := uniqueUsername(t, pool)
@@ -159,6 +163,7 @@ func TestSignupLoginFlow(t *testing.T) {
 	}
 }
 
+// TestSignupValidation checks username normalization and credential limits.
 func TestSignupValidation(t *testing.T) {
 	router, pool := testRouter(t)
 	// Uppercase input; the row is stored lowercased, so clean up by that.
@@ -196,6 +201,7 @@ func TestSignupValidation(t *testing.T) {
 	}
 }
 
+// TestUpdateMeRejectsEmptyUsername checks profile username validation and updates.
 func TestUpdateMeRejectsEmptyUsername(t *testing.T) {
 	router, pool := testRouter(t)
 	username := uniqueUsername(t, pool)

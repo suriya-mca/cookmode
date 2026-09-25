@@ -59,6 +59,7 @@ func (h *userHandler) getByID(c *gin.Context) {
 	c.JSON(http.StatusOK, u)
 }
 
+// updateMe validates and applies changes to the authenticated user's profile.
 func (h *userHandler) updateMe(c *gin.Context) {
 	userID := middleware.UserIDFrom(c)
 	var req struct {

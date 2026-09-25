@@ -34,6 +34,7 @@ type authHandler struct {
 	auth *middleware.Auth
 }
 
+// signup validates credentials, creates a local user, and returns a session token.
 func (h *authHandler) signup(c *gin.Context) {
 	var req struct {
 		Username    string `json:"username"`
@@ -76,6 +77,7 @@ func (h *authHandler) signup(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"token": token, "user": user})
 }
 
+// login verifies a local password and returns a token for valid credentials.
 func (h *authHandler) login(c *gin.Context) {
 	var req struct {
 		Username string `json:"username"`

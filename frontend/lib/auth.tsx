@@ -1,77 +1,98 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
-import { tokenStore, api } from "./api";
+import { tokenStore, api, onUnauthorized } from "./api";
+import { queryClient } from "./query";
 
-type User = {
+export type User = {
   id: string;
   username: string;
   display_name?: string;
+  avatar_url?: string;
+  bio?: string;
 };
 
 type AuthState = {
   user: User | null;
-  session: { access_token: string } | null;
+  signedIn: boolean;
   loading: boolean;
+  signIn: (token: string, user: User) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>({
   user: null,
-  session: null,
+  signedIn: false,
   loading: true,
+  signIn: async () => {},
   signOut: async () => {},
   refresh: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<{ access_token: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = async () => {
-    const token = await tokenStore.getToken();
-    if (!token) {
-      setUser(null);
-      setSession(null);
-      setLoading(false);
-      return;
-    }
-    const storedUser = await tokenStore.getUser<User>();
-    if (storedUser) {
-      setUser(storedUser);
-      setSession({ access_token: token });
-    } else {
-      try {
-        const fetched = await api.get<User>("/users/me");
-        setUser(fetched);
-        setSession({ access_token: token });
-      } catch {
-        await tokenStore.clear();
+  // Always validates the stored token against /users/me: the backend rejects
+  // expired tokens (7-day lifetime) and now also rejects malformed ones, so a
+  // cached user object cannot be trusted on its own.
+  const refresh = useCallback(async () => {
+    try {
+      const token = await tokenStore.getToken();
+      if (!token) {
         setUser(null);
-        setSession(null);
+        return;
       }
+      const me = await api.get<User>("/users/me");
+      setUser(me);
+      await tokenStore.setToken(token, me);
+    } catch {
+      await tokenStore.clear();
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    refresh();
   }, []);
 
-  const signOut = async () => {
+  const signIn = useCallback(async (token: string, me: User) => {
+    await tokenStore.setToken(token, me);
+    // Drop anything cached for a previous account.
+    queryClient.clear();
+    setUser(me);
+    setLoading(false);
+  }, []);
+
+  const signOut = useCallback(async () => {
     await tokenStore.clear();
+    queryClient.clear();
     setUser(null);
-    setSession(null);
-  };
+  }, []);
+
+  // Registered before hydration so a rejected token on the very first
+  // /users/me call is still observed.
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        queryClient.clear();
+        setUser(null);
+      }),
+    []
+  );
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, refresh }}>
+    <AuthContext.Provider
+      value={{ user, signedIn: !!user, loading, signIn, signOut, refresh }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -82,6 +103,6 @@ export function useAuth() {
 }
 
 export function useRequireAuth() {
-  const { session, loading } = useAuth();
-  return { authed: !!session, loading };
+  const { signedIn, loading } = useAuth();
+  return { authed: signedIn, loading };
 }

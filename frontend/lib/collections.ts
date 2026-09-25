@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
+import { useAuth } from "./auth";
 
 export type Collection = {
   id: string;
@@ -10,25 +11,29 @@ export type Collection = {
 };
 
 export function useCollections() {
+  const { signedIn } = useAuth();
   return useQuery({
     queryKey: ["collections"],
     queryFn: () => api.get<{ data: Collection[] }>("/collections").then((r) => r.data),
+    enabled: signedIn,
   });
 }
 
 export function useCollection(id: string) {
+  const { signedIn } = useAuth();
   return useQuery({
     queryKey: ["collection", id],
     queryFn: () => api.get<Collection>(`/collections/${id}`),
-    enabled: !!id,
+    enabled: signedIn && !!id,
   });
 }
 
 export function useCollectionRecipes(id: string) {
+  const { signedIn } = useAuth();
   return useQuery({
     queryKey: ["collection-recipes", id],
     queryFn: () => api.get<{ data: any[] }>(`/collections/${id}/recipes`).then((r) => r.data),
-    enabled: !!id,
+    enabled: signedIn && !!id,
   });
 }
 

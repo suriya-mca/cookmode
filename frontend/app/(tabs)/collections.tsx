@@ -4,28 +4,22 @@ import { useState } from "react";
 import { Link } from "expo-router";
 import { useCollections, useCreateCollection, useDeleteCollection, useUpdateCollection } from "@/lib/collections";
 import { theme } from "@/lib/theme";
-import { useAuth } from "@/lib/auth";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function CollectionsScreen() {
-  const { session } = useAuth();
+  return (
+    <RequireAuth title="Sign in to see collections" subtitle="Collections are private to your account.">
+      <CollectionsList />
+    </RequireAuth>
+  );
+}
+
+function CollectionsList() {
   const { data: cols, isLoading } = useCollections();
   const create = useCreateCollection();
   const del = useDeleteCollection();
   const update = useUpdateCollection();
   const [title, setTitle] = useState("");
-
-  if (!session) {
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.cream, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <Text style={{ color: theme.colors.charcoal, fontWeight: "600" }}>Sign in to see collections</Text>
-        <Link href="/(auth)/login" asChild>
-          <Pressable style={{ marginTop: 12, backgroundColor: theme.colors.terracotta, paddingHorizontal: 16, paddingVertical: 10, borderRadius: theme.radius.sm }}>
-            <Text style={{ color: theme.colors.card }}>Sign in</Text>
-          </Pressable>
-        </Link>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.cream, padding: 16, paddingTop: 48 }}>

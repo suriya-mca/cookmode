@@ -5,8 +5,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRecipe } from "@/lib/recipes";
 import { api } from "@/lib/api";
 import { theme } from "@/lib/theme";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function EditRecipe() {
+  return (
+    <RequireAuth title="Sign in to edit recipes">
+      <EditRecipeForm />
+    </RequireAuth>
+  );
+}
+
+function EditRecipeForm() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();

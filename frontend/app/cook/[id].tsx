@@ -7,12 +7,13 @@ import * as Speech from "expo-speech";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useRecipe } from "@/lib/recipes";
+import { ApiError } from "@/lib/api";
 import { theme } from "@/lib/theme";
 
 export default function CookMode() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: r, isLoading } = useRecipe(id!);
+  const { data: r, isLoading, error } = useRecipe(id!);
   const [stepIdx, setStepIdx] = useState(0);
   const [timerSec, setTimerSec] = useState<number | null>(null);
   const sheetRef = useRef<BottomSheet>(null);
@@ -68,6 +69,24 @@ export default function CookMode() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.charcoal, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={theme.colors.cream} />
+      </View>
+    );
+  }
+  // A stale token turns this public read into 401; don't claim the recipe is
+  // missing — offer a re-sign-in instead.
+  if (error instanceof ApiError && error.status === 401) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.charcoal, alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <Text style={{ color: theme.colors.cream, fontWeight: "600" }}>Session expired</Text>
+        <Text style={{ color: theme.colors.cream, opacity: 0.7, fontSize: 13, marginTop: 8, textAlign: "center" }}>
+          Sign in again to start cooking.
+        </Text>
+        <Pressable
+          onPress={() => router.replace("/(auth)/login")}
+          style={{ marginTop: 16, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: theme.colors.terracotta, borderRadius: theme.radius.sm }}
+        >
+          <Text style={{ color: theme.colors.card, fontWeight: "600" }}>Sign in</Text>
+        </Pressable>
       </View>
     );
   }

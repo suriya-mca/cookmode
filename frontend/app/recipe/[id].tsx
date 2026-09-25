@@ -4,17 +4,18 @@ import { Image } from "expo-image";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRecipe } from "@/lib/recipes";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { usePosts, useCreatePost } from "@/lib/social";
+import { usePosts } from "@/lib/social";
+import { SignInPrompt } from "@/components/RequireAuth";
 import { theme } from "@/lib/theme";
 
 export default function RecipeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
-  const { session, user } = useAuth();
-  const { data: r, isLoading } = useRecipe(id!);
+  const { signedIn, user } = useAuth();
+  const { data: r, isLoading, error } = useRecipe(id!);
   const [tab, setTab] = useState<"ingredients" | "steps" | "nutrition">("ingredients");
   const { data: posts } = usePosts(id);
   const createPost = useMutation({
@@ -55,6 +56,16 @@ export default function RecipeDetail() {
       </View>
     );
   }
+  // A stale token turns a public read into 401 (auth.Optional fails closed);
+  // say so instead of claiming the recipe does not exist.
+  if (error instanceof ApiError && error.status === 401) {
+    return (
+      <SignInPrompt
+        title="Session expired"
+        subtitle="Your sign-in expired. Sign in again to keep browsing — nothing was lost."
+      />
+    );
+  }
   if (!r) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.cream }}>
@@ -63,7 +74,8 @@ export default function RecipeDetail() {
     );
   }
 
-  const authed = !!session;
+  const authed = signedIn;
+  const requireSignIn = () => router.push("/(auth)/login");
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.cream }} contentContainerStyle={{ paddingBottom: 24 }}>
@@ -87,19 +99,19 @@ export default function RecipeDetail() {
             <Text style={{ color: theme.colors.card, fontWeight: "600" }}>Cook Mode</Text>
           </Pressable>
           <Pressable
-            onPress={() => (authed ? save.mutate() : Alert.alert("Sign in required"))}
+            onPress={() => (authed ? save.mutate() : requireSignIn())}
             style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
           >
             <Text style={{ color: theme.colors.charcoal }}>Save</Text>
           </Pressable>
           <Pressable
-            onPress={() => (authed ? unsave.mutate() : Alert.alert("Sign in required"))}
+            onPress={() => (authed ? unsave.mutate() : requireSignIn())}
             style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
           >
             <Text style={{ color: theme.colors.charcoal }}>Unsave</Text>
           </Pressable>
           <Pressable
-            onPress={() => (authed ? fork.mutate() : Alert.alert("Sign in required"))}
+            onPress={() => (authed ? fork.mutate() : requireSignIn())}
             style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, paddingHorizontal: 12, justifyContent: "center" }}
           >
             <Text style={{ color: theme.colors.charcoal }}>Fork</Text>
@@ -195,7 +207,7 @@ export default function RecipeDetail() {
               <Text style={{ color: theme.colors.charcoalMuted, fontSize: 12 }}>{p.photo_url}</Text>
             </View>
           ))}
-          {authed && (
+          {authed ? (
             <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
               <TextInput
                 placeholder="Caption (optional)"
@@ -215,6 +227,13 @@ export default function RecipeDetail() {
                 <Text style={{ color: theme.colors.card, fontWeight: "600", fontSize: 12 }}>Post</Text>
               </Pressable>
             </View>
+          ) : (
+            <Pressable
+              onPress={requireSignIn}
+              style={{ marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, padding: 10, alignItems: "center" }}
+            >
+              <Text style={{ color: theme.colors.charcoalMuted, fontSize: 12 }}>Sign in to post your own photo</Text>
+            </Pressable>
           )}
         </View>
       </View>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
+import { useAuth } from "./auth";
 
 export function useFollowers(userId: string) {
   return useQuery({
@@ -40,11 +41,13 @@ export function useUnfollow() {
 }
 
 export function usePosts(recipeId?: string, userId?: string) {
+  const { signedIn } = useAuth();
   const qs = recipeId ? `recipe_id=${recipeId}` : userId ? `user_id=${userId}` : "";
   return useQuery({
     queryKey: ["posts", recipeId, userId],
     queryFn: () => api.get<{ data: any[] }>(`/posts?${qs}`).then((r) => r.data),
-    enabled: !!qs,
+    // GET /posts is auth-required, so guests never trigger a 401.
+    enabled: signedIn && !!qs,
   });
 }
 

@@ -1,66 +1,53 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { api, tokenStore } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
+import { useAuth, type User } from "@/lib/auth";
 import { theme } from "@/lib/theme";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const signIn = async () => {
+  const signInWith = async (path: "/auth/login" | "/auth/signup", title: string) => {
     if (!username.trim() || !password) {
       Alert.alert("Missing fields", "Username and password are required");
       return;
     }
+    if (path === "/auth/signup") {
+      if (username.trim().length < 3 || username.trim().length > 30) {
+        Alert.alert("Invalid username", "Username must be 3-30 characters");
+        return;
+      }
+      if (!/^[A-Za-z0-9_]{3,30}$/.test(username.trim())) {
+        Alert.alert("Invalid username", "Use letters, numbers and underscores only");
+        return;
+      }
+      if (password.length < 8 || password.length > 72) {
+        Alert.alert("Invalid password", "Password must be 8-72 characters");
+        return;
+      }
+    }
     setLoading(true);
     try {
-      const res = await api.post<{ token: string; user: unknown }>("/auth/login", {
+      const res = await api.post<{ token: string; user: User }>(path, {
         username: username.trim(),
         password,
       });
-      await tokenStore.setToken(res.token, res.user);
-      await refresh();
+      await signIn(res.token, res.user);
       router.replace("/(tabs)");
     } catch (e: any) {
-      Alert.alert("Login failed", e.message ?? "Unknown error");
+      Alert.alert(title, e.message ?? "Unknown error");
     } finally {
       setLoading(false);
     }
   };
 
-  const signUp = async () => {
-    if (!username.trim() || !password) {
-      Alert.alert("Missing fields", "Username and password are required");
-      return;
-    }
-    if (username.trim().length < 3 || username.trim().length > 30) {
-      Alert.alert("Invalid username", "Username must be 3-30 characters");
-      return;
-    }
-    if (password.length < 8) {
-      Alert.alert("Invalid password", "Password must be at least 8 characters");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await api.post<{ token: string; user: unknown }>("/auth/signup", {
-        username: username.trim(),
-        password,
-      });
-      await tokenStore.setToken(res.token, res.user);
-      await refresh();
-      router.replace("/(tabs)");
-    } catch (e: any) {
-      Alert.alert("Sign up failed", e.message ?? "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const signInWithPassword = () => signInWith("/auth/login", "Login failed");
+  const signUp = () => signInWith("/auth/signup", "Sign up failed");
 
   return (
     <View
@@ -125,7 +112,7 @@ export default function LoginScreen() {
       />
 
       <Pressable
-        onPress={signIn}
+        onPress={signInWithPassword}
         disabled={loading}
         style={{
           backgroundColor: theme.colors.terracotta,
@@ -148,7 +135,7 @@ export default function LoginScreen() {
       </Pressable>
 
       <Pressable onPress={() => router.replace("/(tabs)")} style={{ alignItems: "center", marginTop: 8 }}>
-        <Text style={{ color: theme.colors.charcoalMuted }}>Continue as guest</Text>
+        <Text style={{ color: theme.colors.charcoalMuted }}>Continue as guest — browsing only</Text>
       </Pressable>
     </View>
   );

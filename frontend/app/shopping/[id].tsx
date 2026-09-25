@@ -4,8 +4,17 @@ import { useState } from "react";
 import { useShoppingList, useToggleShoppingItem, useAddShoppingItems } from "@/lib/shopping";
 import { theme } from "@/lib/theme";
 import { useLocalSearchParams } from "expo-router";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function ShoppingListDetail() {
+  return (
+    <RequireAuth title="Sign in to see this list" subtitle="Shopping lists are tied to your account.">
+      <ShoppingListView />
+    </RequireAuth>
+  );
+}
+
+function ShoppingListView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: list, isLoading } = useShoppingList(id!);
   const toggle = useToggleShoppingItem();

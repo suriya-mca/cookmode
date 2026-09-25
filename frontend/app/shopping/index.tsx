@@ -4,8 +4,17 @@ import { useState } from "react";
 import { useShoppingLists, useCreateShoppingList, useDeleteShoppingList } from "@/lib/shopping";
 import { theme } from "@/lib/theme";
 import { Link } from "expo-router";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function ShoppingListsScreen() {
+  return (
+    <RequireAuth title="Sign in to see shopping lists" subtitle="Shopping lists are tied to your account.">
+      <ShoppingListsView />
+    </RequireAuth>
+  );
+}
+
+function ShoppingListsView() {
   const { data, isLoading } = useShoppingLists();
   const create = useCreateShoppingList();
   const del = useDeleteShoppingList();

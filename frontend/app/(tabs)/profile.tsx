@@ -2,11 +2,19 @@ import { View, Text, Pressable, TextInput, Alert } from "react-native";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { theme } from "@/lib/theme";
-import { Link } from "expo-router";
+import { RequireAuth } from "@/components/RequireAuth";
 import { useFollowers, useFollowing, usePosts, useFollow, useUnfollow, useCreatePost, useDeletePost } from "@/lib/social";
 
 export default function ProfileScreen() {
-  const { session, user, signOut } = useAuth();
+  return (
+    <RequireAuth title="Sign in to see your profile">
+      <ProfileView />
+    </RequireAuth>
+  );
+}
+
+function ProfileView() {
+  const { user, signOut } = useAuth();
   const uid = user?.id ?? "";
   const { data: followers } = useFollowers(uid);
   const { data: following } = useFollowing(uid);
@@ -18,19 +26,6 @@ export default function ProfileScreen() {
   const [followId, setFollowId] = useState("");
   const [postRecipeId, setPostRecipeId] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
-
-  if (!session) {
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.cream, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <Text style={{ fontWeight: "600", color: theme.colors.charcoal }}>Sign in to see profile</Text>
-        <Link href="/(auth)/login" asChild>
-          <Pressable style={{ marginTop: 12, backgroundColor: theme.colors.terracotta, paddingHorizontal: 16, paddingVertical: 10, borderRadius: theme.radius.sm }}>
-            <Text style={{ color: theme.colors.card }}>Sign in</Text>
-          </Pressable>
-        </Link>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.cream, padding: 16, paddingTop: 48, gap: 16 }}>

@@ -3,13 +3,20 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, ScrollView 
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { theme } from "@/lib/theme";
+import { RequireAuth } from "@/components/RequireAuth";
 import type { Recipe } from "@/lib/recipes";
 
 export default function AddScreen() {
+  return (
+    <RequireAuth title="Sign in to create recipes" subtitle="You need an account to publish and save your work.">
+      <AddRecipeForm />
+    </RequireAuth>
+  );
+}
+
+function AddRecipeForm() {
   const router = useRouter();
-  const { session } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cuisine, setCuisine] = useState("");
@@ -28,14 +35,6 @@ export default function AddScreen() {
     onSuccess: (data) => Alert.alert("Upload URL", data.upload_url),
     onError: (e: Error) => Alert.alert("Upload failed", e.message),
   });
-
-  if (!session) {
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.cream, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <Text style={{ fontWeight: "600", color: theme.colors.charcoal }}>Sign in to create recipes</Text>
-      </View>
-    );
-  }
 
   const onCreate = () => {
     if (!title.trim()) return Alert.alert("Title required");

@@ -4,8 +4,17 @@ import { FlashList } from "@shopify/flash-list";
 import { useState } from "react";
 import { useCollection, useCollectionRecipes, useAddToCollection, useRemoveFromCollection } from "@/lib/collections";
 import { theme } from "@/lib/theme";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function CollectionDetail() {
+  return (
+    <RequireAuth title="Sign in to see collections" subtitle="Collections are private to your account.">
+      <CollectionView />
+    </RequireAuth>
+  );
+}
+
+function CollectionView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: col, isLoading } = useCollection(id!);
   const { data: recipes } = useCollectionRecipes(id!);

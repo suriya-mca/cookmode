@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
+import { useAuth } from "./auth";
 
 export type ShoppingList = {
   id: string;
@@ -8,17 +9,20 @@ export type ShoppingList = {
 };
 
 export function useShoppingLists() {
+  const { signedIn } = useAuth();
   return useQuery({
     queryKey: ["shopping-lists"],
     queryFn: () => api.get<{ data: ShoppingList[] }>("/shopping-lists").then((r) => r.data),
+    enabled: signedIn,
   });
 }
 
 export function useShoppingList(id: string) {
+  const { signedIn } = useAuth();
   return useQuery({
     queryKey: ["shopping-list", id],
     queryFn: () => api.get<ShoppingList>(`/shopping-lists/${id}`),
-    enabled: !!id,
+    enabled: signedIn && !!id,
   });
 }
 

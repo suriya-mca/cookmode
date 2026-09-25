@@ -59,6 +59,7 @@ func (h *userHandler) getByID(c *gin.Context) {
 	c.JSON(http.StatusOK, u)
 }
 
+// updateMe validates and applies changes to the authenticated user's profile.
 func (h *userHandler) updateMe(c *gin.Context) {
 	userID := middleware.UserIDFrom(c)
 	var req struct {
@@ -72,12 +73,12 @@ func (h *userHandler) updateMe(c *gin.Context) {
 		return
 	}
 	if req.Username != nil {
-		u := strings.TrimSpace(*req.Username)
-		if u != "" {
-			if len(u) < 3 || len(u) > 30 {
-				httpx.ErrBadRequest(c, "username must be 3-30 characters")
-				return
-			}
+		// An empty or invalid username is a 400: NULLing the username
+		// would permanently lock the account out of password login.
+		u, msg := httpx.NormalizeUsername(*req.Username)
+		if msg != "" {
+			httpx.ErrBadRequest(c, msg)
+			return
 		}
 		req.Username = &u
 	}

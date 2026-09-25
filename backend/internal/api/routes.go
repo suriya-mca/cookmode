@@ -19,11 +19,15 @@ type Deps struct {
 	NutritionService *services.NutritionService
 	River            *river.Client[pgx.Tx]
 	JWTSecret        string
+	// CORSAllowOrigins lists web origins allowed to call the API
+	// (e.g. Expo web dev server). Empty = no cross-origin access.
+	CORSAllowOrigins []string
 }
 
 // NewRouter builds the Gin engine with all /api/v1 routes.
 func NewRouter(d Deps) *gin.Engine {
 	router := gin.Default()
+	router.Use(middleware.CORS(d.CORSAllowOrigins))
 
 	auth := middleware.NewAuth(d.JWTSecret)
 

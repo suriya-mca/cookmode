@@ -20,6 +20,9 @@ import (
 // main initializes the database pool, River client, HTTP server, and application context, then shuts them down on termination signals.
 func main() {
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -54,7 +57,8 @@ func main() {
 		VideoService:     services.NewVideoService(cfg.CFStreamAccountID, cfg.CFStreamAPIToken),
 		NutritionService: services.NewNutritionService(cfg.EdamamAppID, cfg.EdamamAppKey, cfg.USDAAPIKey),
 		River:            riverClient,
-		JWTSecret:        cfg.SupabaseJWTSecret,
+		JWTSecret:        cfg.JWTSecret,
+		CORSAllowOrigins: cfg.CORSAllowOrigins(),
 	})
 
 	srv := &http.Server{

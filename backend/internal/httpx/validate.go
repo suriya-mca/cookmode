@@ -1,10 +1,34 @@
 package httpx
 
 import (
+	"regexp"
 	"strings"
 
 	"cookmode/internal/models"
 )
+
+// usernamePattern is the single username policy for signup, login, and
+// profile updates: lowercase ASCII letters, digits, underscores.
+var usernamePattern = regexp.MustCompile(`^[a-z0-9_]+$`)
+
+// NormalizeUsername trims and lowercases a raw username and enforces the
+// policy. It returns the normalized value, or an error message for the API.
+func NormalizeUsername(raw string) (string, string) {
+	u := strings.ToLower(strings.TrimSpace(raw))
+	if len(u) < 3 || len(u) > 30 || !usernamePattern.MatchString(u) {
+		return "", "username must be 3-30 lowercase letters, digits, or underscores"
+	}
+	return u, ""
+}
+
+// ValidatePassword enforces the password policy. The 72-char cap is bcrypt's
+// input limit — reject it with a 400 instead of a 500 from the hasher.
+func ValidatePassword(pw string) string {
+	if len(pw) < 8 || len(pw) > 72 {
+		return "password must be 8-72 characters"
+	}
+	return ""
+}
 
 func ValidateRecipe(r *models.Recipe) string {
 	if strings.TrimSpace(r.Title) == "" {

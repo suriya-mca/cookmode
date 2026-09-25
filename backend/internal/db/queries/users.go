@@ -108,15 +108,6 @@ func (db *DB) CreateAuthUser(ctx context.Context, id, username, hash, displayNam
 	return &u, nil
 }
 
-func (db *DB) UpdateUser(ctx context.Context, u *models.User) (*models.User, error) {
-	row := db.Pool.QueryRow(ctx, `
-		UPDATE users SET username=$2, display_name=$3, avatar_url=$4, bio=$5
-		WHERE id=$1
-		RETURNING id, username, display_name, avatar_url, bio, created_at, updated_at
-	`, u.ID, nilIfEmpty(u.Username), u.DisplayName, u.AvatarURL, u.Bio)
-	return scanUser(row)
-}
-
 var ErrUsernameTaken = func() error {
 	return &usernameTakenError{}
 }()
@@ -138,12 +129,4 @@ func contains(s, sub string) bool {
 		}
 		return false
 	})()
-}
-
-// nilIfEmpty returns nil for an empty string and the original string otherwise.
-func nilIfEmpty(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
 }

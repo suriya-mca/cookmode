@@ -14,9 +14,9 @@ posts, shopping lists, and ingredient-aware search.
 | Search    | Meilisearch                                   |
 | Storage   | Cloudflare R2 (photos)                        |
 | Video     | Cloudflare Stream                             |
-| Auth      | Supabase Auth (JWT)                           |
+| Auth      | Local auth (bcrypt passwords + HS256 JWT, `/auth/signup` + `/auth/login`) |
 | Nutrition | Edamam (primary), USDA fallback               |
-| App       | Expo `~52` + `expo-router` + `gluestack-ui` + `UniWind` (Tailwind v4) |
+| App       | Expo `~57` + `expo-router` + `gluestack-ui` + `UniWind` (Tailwind v4) |
 
 ## Monorepo layout
 
@@ -27,13 +27,13 @@ backend/              Go API (branch: api)
 │   └── migrate/      migration runner (embedded SQL)
 ├── internal/
 │   ├── api/          routes.go, handlers/, middleware/ (auth.Optional)
-│   ├── config/       env loading (no SUPABASE_URL — only JWT secret)
+│   ├── config/       env loading (`JWT_SECRET` signs local HS256 auth tokens, min 32 chars)
 │   ├── db/           pgx pool + queries/ (recipes/saves/collections/follows/posts/shopping/forks)
 │   ├── httpx/        respond/validate/paginate + visibility helper
 │   ├── jobs/         River workers (process_video → index_recipe)
 │   ├── models/       domain structs (Post.RatingValue *int, Step.anchor_seconds float64)
 │   └── services/     video (10s timeout, context), search (mutex+quoteFilterValue), nutrition
-├── migrations/       SQL files (.up.sql / .down.sql pairs, 000001-000003 + pg_trgm)
+├── migrations/       SQL files (.up.sql / .down.sql pairs, 000001-000004 + pg_trgm)
 ├── pkg/              thin clients (Meilisearch, R2, Stream)
 ├── docker-compose.yml  local Postgres :5433 + Meilisearch :7700
 └── .env.example      template for backend/.env
@@ -62,6 +62,8 @@ Prerequisites: [Docker](https://docs.docker.com/get-docker/), Go 1.27+, Node 24 
 cd backend
 docker compose up -d          # Postgres :5433 + Meilisearch :7700
 cp .env.example .env          # dev defaults already point at compose stack
+# one-time: generate the JWT signing secret (server refuses to start without it)
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 48)|" .env
 make migrate-up               # also runs rivermigrate for river_* tables
 make run                      # :8080 (logs "listening on :8080")
 
@@ -79,6 +81,19 @@ curl http://localhost:8080/api/v1/health
 # → {"status":"ok"}
 curl "http://localhost:8080/api/v1/search?q=garlic"
 ```
+
+### Auth (local, no external provider)
+
+```sh
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"username":"chef_amy","password":"correct-horse-9"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+curl http://localhost:8080/api/v1/users/me -H "Authorization: Bearer $TOKEN"
+```
+
+Login works the same via `POST /api/v1/auth/login`. Tokens are HS256, 7-day
+expiry, no refresh — re-login when they expire. Usernames are lowercase
+`a-z0-9_`, 3-30 chars; passwords 8-72 **bytes** (bcrypt's input limit).
 
 ### Publishing and search
 
@@ -102,7 +117,9 @@ Notes:
 
 ```sh
 cd backend
-go test ./...                          # all unit tests (no DB needed)
+go test ./...                          # unit tests; DB-backed auth tests skip unless DATABASE_URL is set
+DATABASE_URL=postgres://cookmode:cookmode@localhost:5433/cookmode?sslmode=disable \
+  go test ./...                        # includes the DB-backed auth handler tests
 go test ./internal/httpx -run TestValidateRecipe
 cd ../frontend
 pnpm exec tsc --noEmit --skipLibCheck

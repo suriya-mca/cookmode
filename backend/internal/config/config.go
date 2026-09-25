@@ -1,17 +1,54 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
+
+const (
+	// minJWTSecretLen is the minimum accepted JWT signing secret length.
+	// Short secrets make HS256 tokens brute-forceable.
+	minJWTSecretLen = 32
+	// legacyPlaceholderJWTSecret is the old .env.example value from the
+	// Supabase era. It is no longer read, but still rejected so a stale
+	// env cannot start the server with a publicly-known signing key.
+	legacyPlaceholderJWTSecret = "your-supabase-jwt-secret"
+)
+
+// Validate fails fast on config that would silently weaken auth. In
+// particular an empty, short, or well-known JWT secret must never reach
+// the token verifier.
+func (c *Config) Validate() error {
+	if c.JWTSecret == "" {
+		return errors.New("JWT_SECRET is not set — generate one with: openssl rand -base64 48")
+	}
+	if c.JWTSecret == legacyPlaceholderJWTSecret {
+		return errors.New("JWT_SECRET is still the old placeholder value — set a random secret")
+	}
+	if strings.HasPrefix(c.JWTSecret, "changeme") {
+		return errors.New("JWT_SECRET is still the .env.example changeme value — set a random secret")
+	}
+	if len(c.JWTSecret) < minJWTSecretLen {
+		return fmt.Errorf("JWT_SECRET must be at least %d characters (got %d)", minJWTSecretLen, len(c.JWTSecret))
+	}
+	return nil
+}
 
 type Config struct {
 	Port        string
 	DatabaseURL string
 
-	SupabaseJWTSecret string
+	// JWTSecret signs and verifies locally-issued HS256 auth tokens.
+	JWTSecret string
+
+	// CORSAllowOriginsRaw is a comma-separated list of web origins allowed
+	// to call the API ("*" = anywhere; dev only).
+	CORSAllowOriginsRaw string
 
 	MeiliHost   string
 	MeiliAPIKey string
@@ -38,7 +75,9 @@ func Load() *Config {
 		Port:        getEnv("PORT", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 
-		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
+		JWTSecret: getEnv("JWT_SECRET", ""),
+
+		CORSAllowOriginsRaw: getEnv("CORS_ALLOW_ORIGINS", "http://localhost:8081"),
 
 		MeiliHost:   getEnv("MEILI_HOST", "http://localhost:7700"),
 		MeiliAPIKey: getEnv("MEILI_API_KEY", ""),
@@ -55,6 +94,17 @@ func Load() *Config {
 		EdamamAppKey: getEnv("EDAMAM_APP_KEY", ""),
 		USDAAPIKey:   getEnv("USDA_API_KEY", ""),
 	}
+}
+
+// CORSAllowOrigins parses CORSAllowOriginsRaw into a trimmed allowlist.
+func (c *Config) CORSAllowOrigins() []string {
+	var out []string
+	for _, o := range strings.Split(c.CORSAllowOriginsRaw, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {

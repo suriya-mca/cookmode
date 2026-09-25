@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,6 +14,11 @@ import (
 	"cookmode/internal/db/queries"
 	"cookmode/internal/httpx"
 )
+
+// dummyHash is compared against on unknown-user / passwordless logins so a
+// bcrypt comparison (~DefaultCost) always runs and the failure path takes
+// the same time as a real password check.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("cookmode-nonexistent-user-credential"), bcrypt.DefaultCost)
 
 func RegisterAuth(rg *gin.RouterGroup, pool *pgxpool.Pool, auth *middleware.Auth) {
 	h := &authHandler{db: queries.New(pool), auth: auth}
@@ -40,13 +44,13 @@ func (h *authHandler) signup(c *gin.Context) {
 		httpx.ErrBadRequest(c, "invalid body")
 		return
 	}
-	req.Username = strings.TrimSpace(req.Username)
-	if len(req.Username) < 3 || len(req.Username) > 30 {
-		httpx.ErrBadRequest(c, "username must be 3-30 characters")
+	username, msg := httpx.NormalizeUsername(req.Username)
+	if msg != "" {
+		httpx.ErrBadRequest(c, msg)
 		return
 	}
-	if len(req.Password) < 8 {
-		httpx.ErrBadRequest(c, "password must be at least 8 characters")
+	if msg := httpx.ValidatePassword(req.Password); msg != "" {
+		httpx.ErrBadRequest(c, msg)
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -55,7 +59,7 @@ func (h *authHandler) signup(c *gin.Context) {
 		return
 	}
 	id := uuid.NewString()
-	user, err := h.db.CreateAuthUser(c.Request.Context(), id, req.Username, string(hash), req.DisplayName)
+	user, err := h.db.CreateAuthUser(c.Request.Context(), id, username, string(hash), req.DisplayName)
 	if err != nil {
 		if errors.Is(err, queries.ErrUsernameTaken) {
 			c.JSON(http.StatusConflict, gin.H{"error": "username already taken"})
@@ -81,14 +85,20 @@ func (h *authHandler) login(c *gin.Context) {
 		httpx.ErrBadRequest(c, "invalid body")
 		return
 	}
-	req.Username = strings.TrimSpace(req.Username)
-	if req.Username == "" || req.Password == "" {
+	username, msg := httpx.NormalizeUsername(req.Username)
+	if msg != "" {
+		httpx.ErrBadRequest(c, msg)
+		return
+	}
+	if req.Password == "" {
 		httpx.ErrBadRequest(c, "username and password are required")
 		return
 	}
-	user, hash, err := h.db.GetUserByUsername(c.Request.Context(), req.Username)
+	user, hash, err := h.db.GetUserByUsername(c.Request.Context(), username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			// Flatten timing: burn one bcrypt comparison before the 401.
+			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
@@ -96,6 +106,8 @@ func (h *authHandler) login(c *gin.Context) {
 		return
 	}
 	if hash == "" {
+		// Legacy/imported rows have no local password — same 401, same cost.
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}

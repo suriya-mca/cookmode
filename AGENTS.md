@@ -29,9 +29,9 @@
 
 ## Architecture
 
-- Stack: Go + Gin, PostgreSQL, River queue (Postgres-backed — **no Redis**), Meilisearch, Cloudflare R2 (photos), Cloudflare Stream (video), Supabase Auth; Expo `~52` + `expo-router` + `gluestack-ui` (UniWind/Tailwind v4) + `react-native-reanimated` + `uniwind`.
+- Stack: Go + Gin, PostgreSQL, River queue (Postgres-backed — **no Redis**), Meilisearch, Cloudflare R2 (photos), Cloudflare Stream (video), local auth (bcrypt + HS256 JWT, Supabase dropped); Expo `~57` + `expo-router` + `gluestack-ui` (UniWind/Tailwind v4) + `react-native-reanimated` + `uniwind`.
 - Routes are registered in `internal/api/routes.go`; handlers in `internal/api/handlers/`, all under `/api/v1`. `POST /recipes/:id/publish` flips `draft|processing → published` and sync-indexes to Meilisearch.
-- Auth is Supabase JWT (HS256) via `internal/api/middleware/auth.go`; handlers read `user_id` with `middleware.UserIDFrom(c)`; `GET /recipes/:id` uses `auth.Optional()` for draft visibility.
+- Auth is a locally-issued HS256 JWT via `internal/api/middleware/auth.go` (`POST /auth/signup|/login`, bcrypt, 7-day expiry, no refresh; signed with `JWT_SECRET`, must be ≥32 chars or startup fails in `config.Validate`); handlers read `user_id` with `middleware.UserIDFrom(c)`; `GET /recipes/:id` uses `auth.Optional()` for draft visibility (invalid/expired token → 401, no header → anonymous).
 - One pgx pool (`internal/db`) backs both queries and the River client. River is started in `cmd/api/main.go` via `jobs.NewClient(pool, indexer)` → `rivermigrate` → `river.Start`; graceful `Stop` on SIGTERM.
 - Recipes are JSONB-first: `ingredients`, `steps`, `substitutions`, `nutrition` columns mirror structs in `internal/models/recipe.go`. Keep model tags and `migrations/000001_init.up.sql` in sync when changing fields. `steps[].anchor_seconds` is `float64` (sub-second).
 - Frontend theme tokens live in `frontend/lib/theme.ts` (extracted from `ui/*.jpeg`: cream/terracotta/sage palette, `Playfair`/`Inter`, `radius 20`). Gluestack config in `components/ui/gluestack-ui-provider`, `global.css` (`@import tailwindcss; @import 'uniwind'`), `babel/metro` `withUniwindConfig`.

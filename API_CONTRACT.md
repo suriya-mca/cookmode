@@ -1,11 +1,22 @@
 # CookMode API Contract
 
 Base URL: `/api/v1`
-Auth: Supabase JWT (HS256) — `Authorization: Bearer <token>`. Endpoints marked 🔒 require it; the token's `sub` claim identifies the user.
+Auth: Local HS256 JWT issued by this API — `Authorization: Bearer <token>`. The token's `sub` claim is the user's UUID; tokens expire after 7 days. There are no refresh tokens — re-login when expired. Endpoints marked 🔒 require it.
 
 Status codes: `200` success, `201` created, `204` no content, `400` validation error, `401` unauthorized, `403` forbidden, `404` not found.
 
 Recipe object: `id, user_id, title, description, cuisine, prep_time_min, cook_time_min, servings, difficulty, dietary_tags[], ingredients[{name,quantity,unit,optional}], steps[{order,text,anchor_seconds,duration_hint}], substitutions[{for_ingredient,alternatives[]}], nutrition{calories,protein_g,...}, video_uid, video_hls_url, video_thumbnail_url, video_duration_sec, views, saves, status(draft|processing|published|archived), created_at, updated_at`
+
+## Auth
+
+Usernames are lowercase `a-z0-9_` (3-30 chars) and are stored normalized. Passwords are 8-72 **bytes** (bcrypt's input limit).
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/auth/signup` | public | Body `{ username, password, display_name? }`. → `201 { token, user }`. `400` validation, `409 username already taken` |
+| POST | `/auth/login` | public | Body `{ username, password }`. → `200 { token, user }`. `400` validation, `401 invalid credentials` (same body for unknown user / no local password / wrong password) |
+
+`token` is the Bearer JWT for subsequent calls. `user` has the Users shape below. Accounts without a local `password_hash` (legacy/imported rows) always get `401` — re-register a username instead.
 
 ## Health
 
@@ -18,7 +29,7 @@ Recipe object: `id, user_id, title, description, cuisine, prep_time_min, cook_ti
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | GET | `/recipes` | public | List **published** only. Paginated: `?limit=&cursor=` (cursor is base64 `created_at\|id`) |
-| GET | `/recipes/:id` | public* | Single recipe. Draft/processing/archived visible only to owner (otherwise 404). Uses `Auth.Optional()`. Increments `views` on every read (500 if the counter update fails) |
+| GET | `/recipes/:id` | public* | Single recipe. Draft/processing/archived visible only to owner (otherwise 404). Uses `Auth.Optional()`: no `Authorization` header = anonymous, but a **present-yet-invalid/expired** token → `401`. Increments `views` on every read (500 if the counter update fails) |
 | POST | `/recipes` | 🔒 | Create draft (`status=draft`). Body is `Recipe` JSON without `id/user_id/status/video_*`. Validates title 1-200, servings ≥0, difficulty enum, ingredients/steps |
 | PATCH | `/recipes/:id` | 🔒 | Partial update (only supplied JSON keys are merged; omitted keys keep existing). Owner only, archived → 400 |
 | DELETE | `/recipes/:id` | 🔒 | Archive own recipe (`status→archived`). Idempotent if already archived |
@@ -58,7 +69,7 @@ Meilisearch `recipes` index. Typo-tolerant, filterable on `ingredients`, `dietar
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | GET | `/users/me` | 🔒 | Own profile (auto-creates placeholder `{id}` on first call). Shape `{id, username, display_name, avatar_url, bio, created_at, updated_at}` |
-| PATCH | `/users/me` | 🔒 | Partial update `{username? 3-30 unique, display_name?, avatar_url?, bio? ≤500}`. Empty username clears to NULL. 400 `username already taken` |
+| PATCH | `/users/me` | 🔒 | Partial update `{username? lowercase a-z0-9_ 3-30 unique, display_name?, avatar_url?, bio? ≤500}`. Username is normalized (trimmed + lowercased); empty or invalid → `400`. `400 username already taken` |
 | GET | `/users/:id` | public | Public profile by id. 404 if missing |
 
 ## Follows
